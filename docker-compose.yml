@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: slack_clone_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: slack_clone_db
+      POSTGRES_USER: slack_user
+      POSTGRES_PASSWORD: slack_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - slack_clone_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  slack_clone_postgres_data:
