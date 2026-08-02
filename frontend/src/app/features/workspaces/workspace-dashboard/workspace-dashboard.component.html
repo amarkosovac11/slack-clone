@@ -1,0 +1,48 @@
+<div class="dashboard">
+  <header class="topbar">
+    <div>
+      <div class="brand">Slack Clone</div>
+      @if (currentUser(); as user) { <span class="user-name">{{ user.displayName }}</span> }
+    </div>
+    <button class="logout-button" type="button" (click)="logout()">Log out</button>
+  </header>
+
+  <main class="content">
+    <section class="heading">
+      <h1>Your workspaces</h1>
+      <p>Choose an existing workspace or create a new one.</p>
+    </section>
+
+    @if (errorMessage()) { <div class="error-message">{{ errorMessage() }}</div> }
+
+    <section class="create-card">
+      <h2>Create workspace</h2>
+      <form [formGroup]="createForm" (ngSubmit)="createWorkspace()">
+        <input type="text" formControlName="name" placeholder="Workspace name" />
+        <button type="submit" [disabled]="isCreating()">{{ isCreating() ? 'Creating...' : 'Create' }}</button>
+      </form>
+      @if (createForm.controls.name.touched && createForm.controls.name.invalid) {
+        <small class="field-error">Workspace name must have between 2 and 100 characters.</small>
+      }
+    </section>
+
+    @if (isLoading()) {
+      <div class="empty-state">Loading workspaces...</div>
+    } @else if (workspaces().length === 0) {
+      <div class="empty-state">You do not belong to any workspace yet.</div>
+    } @else {
+      <section class="workspace-grid">
+        @for (workspace of workspaces(); track workspace.id) {
+          <article class="workspace-card">
+            <div class="workspace-icon">{{ workspace.name.charAt(0).toUpperCase() }}</div>
+            <div>
+              <h3>{{ workspace.name }}</h3>
+              <p>{{ workspace.slug }}</p>
+              <span class="role">{{ workspace.currentUserRole }}</span>
+            </div>
+          </article>
+        }
+      </section>
+    }
+  </main>
+</div>
