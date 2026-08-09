@@ -1,0 +1,35 @@
+<div class="auth-page">
+  <main class="auth-card">
+    <div class="brand">Slack Clone</div>
+    <h1>Create account</h1>
+    <p class="subtitle">Create your account and start collaborating.</p>
+
+    @if (errorMessage()) { <div class="error-message">{{ errorMessage() }}</div> }
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label for="displayName">Display name</label>
+      <input id="displayName" type="text" formControlName="displayName" placeholder="Amar Kosovac" autocomplete="name" />
+      @if (form.controls.displayName.touched && form.controls.displayName.invalid) {
+        <small class="field-error">Display name must have between 2 and 100 characters.</small>
+      }
+
+      <label for="email">Email</label>
+      <input id="email" type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <small class="field-error">Enter a valid email address.</small>
+      }
+
+      <label for="password">Password</label>
+      <input id="password" type="password" formControlName="password" placeholder="At least 8 characters" autocomplete="new-password" />
+      @if (form.controls.password.touched && form.controls.password.invalid) {
+        <small class="field-error">Password must have between 8 and 72 characters.</small>
+      }
+
+      <button type="submit" [disabled]="isSubmitting()">
+        {{ isSubmitting() ? 'Creating account...' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="switch-page">Already have an account? <a routerLink="/login">Sign in</a></p>
+  </main>
+</div>
