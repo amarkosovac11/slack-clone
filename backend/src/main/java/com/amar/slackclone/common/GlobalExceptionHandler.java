@@ -13,6 +13,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
+import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
+import com.amar.slackclone.channel.WorkspaceNotFoundException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -91,4 +95,61 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(error);
     }
+
+    @ExceptionHandler(WorkspaceNotFoundException.class)
+public ResponseEntity<ApiError> handleWorkspaceNotFound(
+        WorkspaceNotFoundException exception,
+        HttpServletRequest request
+) {
+    ApiError error = new ApiError(
+            Instant.now(),
+            HttpStatus.NOT_FOUND.value(),
+            HttpStatus.NOT_FOUND.getReasonPhrase(),
+            exception.getMessage(),
+            request.getRequestURI(),
+            null
+    );
+
+    return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(error);
+}
+
+@ExceptionHandler(WorkspaceAccessDeniedException.class)
+public ResponseEntity<ApiError> handleWorkspaceAccessDenied(
+        WorkspaceAccessDeniedException exception,
+        HttpServletRequest request
+) {
+    ApiError error = new ApiError(
+            Instant.now(),
+            HttpStatus.FORBIDDEN.value(),
+            HttpStatus.FORBIDDEN.getReasonPhrase(),
+            exception.getMessage(),
+            request.getRequestURI(),
+            null
+    );
+
+    return ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
+            .body(error);
+}
+
+@ExceptionHandler(AuthenticatedUserNotFoundException.class)
+public ResponseEntity<ApiError> handleAuthenticatedUserNotFound(
+        AuthenticatedUserNotFoundException exception,
+        HttpServletRequest request
+) {
+    ApiError error = new ApiError(
+            Instant.now(),
+            HttpStatus.UNAUTHORIZED.value(),
+            HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+            exception.getMessage(),
+            request.getRequestURI(),
+            null
+    );
+
+    return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(error);
+}
 }
