@@ -1,48 +1,400 @@
-<div class="dashboard">
-  <header class="topbar">
-    <div>
-      <div class="brand">Slack Clone</div>
-      @if (currentUser(); as user) { <span class="user-name">{{ user.displayName }}</span> }
-    </div>
-    <button class="logout-button" type="button" (click)="logout()">Log out</button>
-  </header>
-
-  <main class="content">
-    <section class="heading">
-      <h1>Your workspaces</h1>
-      <p>Choose an existing workspace or create a new one.</p>
-    </section>
-
-    @if (errorMessage()) { <div class="error-message">{{ errorMessage() }}</div> }
-
-    <section class="create-card">
-      <h2>Create workspace</h2>
-      <form [formGroup]="createForm" (ngSubmit)="createWorkspace()">
-        <input type="text" formControlName="name" placeholder="Workspace name" />
-        <button type="submit" [disabled]="isCreating()">{{ isCreating() ? 'Creating...' : 'Create' }}</button>
-      </form>
-      @if (createForm.controls.name.touched && createForm.controls.name.invalid) {
-        <small class="field-error">Workspace name must have between 2 and 100 characters.</small>
-      }
-    </section>
-
-    @if (isLoading()) {
-      <div class="empty-state">Loading workspaces...</div>
-    } @else if (workspaces().length === 0) {
-      <div class="empty-state">You do not belong to any workspace yet.</div>
-    } @else {
-      <section class="workspace-grid">
-        @for (workspace of workspaces(); track workspace.id) {
-          <article class="workspace-card">
-            <div class="workspace-icon">{{ workspace.name.charAt(0).toUpperCase() }}</div>
-            <div>
-              <h3>{{ workspace.name }}</h3>
-              <p>{{ workspace.slug }}</p>
-              <span class="role">{{ workspace.currentUserRole }}</span>
-            </div>
-          </article>
-        }
-      </section>
-    }
-  </main>
+@if (errorMessage()) {
+<div class="error-message">
+  {{ errorMessage() }}
 </div>
+}
+
+<section class="create-card">
+  <div class="create-card-header">
+    <div>
+      <h2>Create workspace</h2>
+      <p>Create a new place for your team to collaborate.</p>
+    </div>
+  </div>
+
+  <form [formGroup]="createForm" (ngSubmit)="createWorkspace()">
+    <input type="text" formControlName="name" placeholder="Workspace name" />
+
+    <button type="submit" [disabled]="isCreating()">
+      {{ isCreating() ? 'Creating...' : 'Create' }}
+    </button>
+  </form>
+
+  @if (
+  createForm.controls.name.touched &&
+  createForm.controls.name.invalid
+  ) {
+  <small class="field-error">
+    Workspace name must have between 2 and 100 characters.
+  </small>
+  }
+</section>
+
+@if (isLoading()) {
+
+<div class="empty-state">
+  Loading workspaces...
+</div>
+
+} @else if (workspaces().length === 0) {
+
+<div class="empty-state">
+  You do not belong to any workspace yet.
+</div>
+
+} @else {
+
+<section class="workspace-section">
+
+  <div class="section-heading">
+    <div>
+      <h2>Your workspaces</h2>
+      <p>Select a workspace to view its channels.</p>
+    </div>
+  </div>
+
+  <div class="workspace-grid">
+
+    @for (workspace of workspaces(); track workspace.id) {
+
+    <button type="button" class="workspace-card" [class.selected]="isWorkspaceSelected(workspace.id)"
+      (click)="selectWorkspace(workspace.id)">
+
+      <div class="workspace-icon">
+        {{ workspace.name.charAt(0).toUpperCase() }}
+      </div>
+
+      <div class="workspace-info">
+
+        <div class="workspace-name-row">
+          <h3>{{ workspace.name }}</h3>
+
+          @if (isWorkspaceSelected(workspace.id)) {
+          <span class="selected-label">
+            Selected
+          </span>
+          }
+        </div>
+
+        <p>{{ workspace.slug }}</p>
+
+        <span class="role">
+          {{ workspace.currentUserRole }}
+        </span>
+
+      </div>
+
+    </button>
+
+    }
+
+  </div>
+
+</section>
+}
+
+@if (selectedWorkspaceId()) {
+
+<section class="workspace-view">
+
+  <aside class="channel-sidebar">
+
+    <div class="channel-sidebar-header">
+      <div>
+        <span class="sidebar-label">
+          Workspace
+        </span>
+
+        <h2>Channels</h2>
+      </div>
+
+      <button type="button" class="add-channel-button" title="Create channel" (click)="openCreateChannelModal()">
+        +
+      </button>
+    </div>
+
+    <div class="channel-divider"></div>
+
+    @if (channelsLoading()) {
+
+    <div class="channel-state">
+      Loading channels...
+    </div>
+
+    } @else if (channelsError()) {
+
+    <div class="sidebar-error">
+      {{ channelsError() }}
+    </div>
+
+    } @else if (channels().length === 0) {
+
+    <div class="channel-state">
+      No channels yet.
+    </div>
+
+    } @else {
+
+    <div class="channel-group-title">
+      Channels
+    </div>
+
+    <div class="channel-list">
+
+      @for (channel of channels(); track channel.id) {
+
+      <button type="button" class="channel-item" [class.active]="selectedChannel()?.id === channel.id"
+        (click)="selectChannel(channel)">
+
+        <span class="channel-symbol">
+          {{ channel.privateChannel ? '🔒' : '#' }}
+        </span>
+
+        <span class="channel-name">
+          {{ channel.name }}
+        </span>
+
+      </button>
+
+      }
+
+    </div>
+
+    }
+
+  </aside>
+
+  <main class="channel-content">
+
+    @if (selectedChannel()) {
+
+    <header class="channel-header">
+
+      <div>
+        <div class="channel-title-row">
+
+          <span class="channel-title-symbol">
+            {{ selectedChannel()!.privateChannel ? '🔒' : '#' }}
+          </span>
+
+          <h2>
+            {{ selectedChannel()!.name }}
+          </h2>
+
+        </div>
+
+        @if (selectedChannel()!.description) {
+        <p>
+          {{ selectedChannel()!.description }}
+        </p>
+        } @else {
+        <p>
+          No channel description.
+        </p>
+        }
+
+      </div>
+
+      @if (selectedChannel()!.privateChannel) {
+      <span class="private-badge">
+        Private
+      </span>
+      } @else {
+      <span class="public-badge">
+        Public
+      </span>
+      }
+
+    </header>
+
+    <div class="channel-body">
+
+      <div class="channel-welcome">
+
+        <div class="welcome-icon">
+          {{ selectedChannel()!.privateChannel ? '🔒' : '#' }}
+        </div>
+
+        <h1>
+          Welcome to {{ selectedChannel()!.name }}
+        </h1>
+
+        <p>
+          This is the beginning of the
+          <strong>{{ selectedChannel()!.name }}</strong>
+          channel.
+        </p>
+
+        <span>
+          Messages will appear here when messaging is implemented.
+        </span>
+
+      </div>
+
+    </div>
+
+    <div class="message-composer-placeholder">
+
+      <span>
+        Message #{{ selectedChannel()!.name }}
+      </span>
+
+      <button type="button" disabled>
+        Send
+      </button>
+
+    </div>
+
+    } @else {
+
+    <div class="select-channel-state">
+
+      <div class="select-channel-icon">
+        #
+      </div>
+
+      <h2>Select a channel</h2>
+
+      <p>
+        Choose a channel from the sidebar to open it.
+      </p>
+
+    </div>
+
+    }
+
+  </main>
+
+</section>
+
+}
+
+@if (showCreateChannelModal()) {
+
+<div
+  class="modal-backdrop"
+  (click)="closeCreateChannelModal()"
+>
+  <div
+    class="create-channel-modal"
+    (click)="$event.stopPropagation()"
+  >
+
+    <div class="modal-header">
+      <div>
+        <h2>Create channel</h2>
+        <p>
+          Channels are where your team communicates.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        class="modal-close-button"
+        aria-label="Close create channel modal"
+        [disabled]="isCreatingChannel()"
+        (click)="closeCreateChannelModal()"
+      >
+        ×
+      </button>
+    </div>
+
+    <form
+      class="create-channel-form"
+      [formGroup]="createChannelForm"
+      (ngSubmit)="createChannel()"
+    >
+
+      <div class="form-field">
+        <label for="channel-name">
+          Channel name
+        </label>
+
+        <input
+          id="channel-name"
+          type="text"
+          formControlName="name"
+          placeholder="e.g. development"
+        />
+
+        @if (
+          createChannelForm.controls.name.touched &&
+          createChannelForm.controls.name.invalid
+        ) {
+          <small class="field-error">
+            Channel name must have between 2 and 100 characters.
+          </small>
+        }
+      </div>
+
+      <div class="form-field">
+        <label for="channel-description">
+          Description
+          <span class="optional-label">Optional</span>
+        </label>
+
+        <textarea
+          id="channel-description"
+          formControlName="description"
+          placeholder="What is this channel about?"
+          rows="4"
+        ></textarea>
+
+        @if (
+          createChannelForm.controls.description.touched &&
+          createChannelForm.controls.description.invalid
+        ) {
+          <small class="field-error">
+            Description cannot be longer than 255 characters.
+          </small>
+        }
+      </div>
+
+      <label class="private-channel-option">
+        <input
+          type="checkbox"
+          formControlName="privateChannel"
+        />
+
+        <div>
+          <strong>Make private</strong>
+
+          <span>
+            Only invited members will be able to see and access this channel.
+          </span>
+        </div>
+      </label>
+
+      @if (channelCreateError()) {
+        <div class="modal-error">
+          {{ channelCreateError() }}
+        </div>
+      }
+
+      <div class="modal-actions">
+
+        <button
+          type="button"
+          class="secondary-button"
+          [disabled]="isCreatingChannel()"
+          (click)="closeCreateChannelModal()"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          class="primary-button"
+          [disabled]="isCreatingChannel()"
+        >
+          {{ isCreatingChannel() ? 'Creating...' : 'Create channel' }}
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+</div>
+
+}
