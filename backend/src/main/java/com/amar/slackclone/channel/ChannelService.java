@@ -72,26 +72,35 @@ public class ChannelService {
         return toResponse(savedChannel);
     }
 
-    @Transactional(readOnly = true)
-    public List<ChannelResponse> getChannels(
-            Long workspaceId,
-            String currentUserEmail) {
-        User currentUser = getCurrentUser(currentUserEmail);
+  @Transactional(readOnly = true)
+public List<ChannelResponse> getChannels(
+        Long workspaceId,
+        String currentUserEmail
+) {
+    User currentUser = getCurrentUser(currentUserEmail);
 
-        workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new IllegalArgumentException("Workspace not found"));
+    workspaceRepository.findById(workspaceId)
+            .orElseThrow(() ->
+                    new WorkspaceNotFoundException(workspaceId)
+            );
 
-        workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "You are not a member of this workspace"));
+    workspaceMemberRepository
+            .findByWorkspaceIdAndUserId(
+                    workspaceId,
+                    currentUser.getId()
+            )
+            .orElseThrow(() ->
+                    new WorkspaceAccessDeniedException(
+                            "You are not a member of this workspace"
+                    )
+            );
 
-        return channelRepository
-                .findAllByWorkspaceIdOrderByCreatedAtAsc(workspaceId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
+    return channelRepository
+            .findAllByWorkspaceIdOrderByCreatedAtAsc(workspaceId)
+            .stream()
+            .map(this::toResponse)
+            .toList();
+}
 
     private User getCurrentUser(String email) {
         return userRepository.findByEmailIgnoreCase(email)
