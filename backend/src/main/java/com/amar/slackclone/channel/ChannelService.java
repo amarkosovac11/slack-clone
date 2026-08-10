@@ -23,14 +23,18 @@ public class ChannelService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
+    private final ChannelMemberRepository channelMemberRepository;
 
     public ChannelService(
             ChannelRepository channelRepository,
             WorkspaceRepository workspaceRepository,
+            ChannelMemberRepository channelMemberRepository,
             WorkspaceMemberRepository workspaceMemberRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository
+    ) {
         this.channelRepository = channelRepository;
         this.workspaceRepository = workspaceRepository;
+        this.channelMemberRepository = channelMemberRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
     }
@@ -39,21 +43,31 @@ public class ChannelService {
     public ChannelResponse createChannel(
             Long workspaceId,
             CreateChannelRequest request,
-            String currentUserEmail) {
+            String currentUserEmail
+    ) {
         User currentUser = getCurrentUser(currentUserEmail);
 
         Workspace workspace = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
+                .orElseThrow(() ->
+                        new WorkspaceNotFoundException(workspaceId)
+                );
 
         WorkspaceMember membership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-                .orElseThrow(() -> new WorkspaceAccessDeniedException(
-                        "You are not a member of this workspace"));
+                .findByWorkspaceIdAndUserId(
+                        workspaceId,
+                        currentUser.getId()
+                )
+                .orElseThrow(() ->
+                        new WorkspaceAccessDeniedException(
+                                "You are not a member of this workspace"
+                        )
+                );
 
         if (membership.getRole() != WorkspaceRole.OWNER
                 && membership.getRole() != WorkspaceRole.ADMIN) {
             throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can create channels");
+                    "Only workspace owners and admins can create channels"
+            );
         }
 
         String name = request.name().trim();
@@ -69,51 +83,221 @@ public class ChannelService {
 
         Channel savedChannel = channelRepository.save(channel);
 
+        if (savedChannel.isPrivateChannel()) {
+            ChannelMember channelMember = new ChannelMember();
+            channelMember.setChannel(savedChannel);
+            channelMember.setUser(currentUser);
+
+            channelMemberRepository.save(channelMember);
+        }
+
         return toResponse(savedChannel);
     }
 
-  @Transactional(readOnly = true)
-public List<ChannelResponse> getChannels(
-        Long workspaceId,
-        String currentUserEmail
-) {
-    User currentUser = getCurrentUser(currentUserEmail);
+    @Transactional(readOnly = true)
+    public List<ChannelResponse> getChannels(
+            Long workspaceId,
+            String currentUserEmail
+    ) {
+        User currentUser = getCurrentUser(currentUserEmail);
 
-    workspaceRepository.findById(workspaceId)
-            .orElseThrow(() ->
-                    new WorkspaceNotFoundException(workspaceId)
-            );
+        workspaceRepository.findById(workspaceId)
+                .orElseThrow(() ->
+                        new WorkspaceNotFoundException(workspaceId)
+                );
 
-    workspaceMemberRepository
-            .findByWorkspaceIdAndUserId(
-                    workspaceId,
-                    currentUser.getId()
-            )
-            .orElseThrow(() ->
-                    new WorkspaceAccessDeniedException(
-                            "You are not a member of this workspace"
-                    )
-            );
+        workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(
+                        workspaceId,
+                        currentUser.getId()
+                )
+                .orElseThrow(() ->
+                        new WorkspaceAccessDeniedException(
+                                "You are not a member of this workspace"
+                        )
+                );
 
-    return channelRepository
-            .findAllByWorkspaceIdOrderByCreatedAtAsc(workspaceId)
-            .stream()
-            .map(this::toResponse)
-            .toList();
-}
-
-    private User getCurrentUser(String email) {
-        return userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(AuthenticatedUserNotFoundException::new);
+        return channelRepository
+                .findVisibleChannels(
+                        workspaceId,
+                        currentUser.getId()
+                )
+                .stream()
+                .map(this::toResponse)
+                .toList();
     }
 
-    private String generateUniqueSlug(Long workspaceId, String name) {
+    @Transactional
+    public ChannelResponse addMember(
+            Long workspaceId,
+            Long channelId,
+            Long userId,
+            String currentUserEmail
+    ) {
+        User currentUser = getCurrentUser(currentUserEmail);
+
+        workspaceRepository.findById(workspaceId)
+                .orElseThrow(() ->
+                        new WorkspaceNotFoundException(workspaceId)
+                );
+
+        WorkspaceMember currentMembership = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(
+                        workspaceId,
+                        currentUser.getId()
+                )
+                .orElseThrow(() ->
+                        new WorkspaceAccessDeniedException(
+                                "You are not a member of this workspace"
+                        )
+                );
+
+        if (currentMembership.getRole() != WorkspaceRole.OWNER
+                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
+            throw new WorkspaceAccessDeniedException(
+                    "Only workspace owners and admins can manage channel members"
+            );
+        }
+
+        Channel channel = channelRepository
+                .findByIdAndWorkspaceId(
+                        channelId,
+                        workspaceId
+                )
+                .orElseThrow(() ->
+                        new ChannelNotFoundException(channelId)
+                );
+
+        if (!channel.isPrivateChannel()) {
+            throw new ChannelMembershipConflictException(
+                    "Members can only be managed for private channels"
+            );
+        }
+
+        User userToAdd = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new UserNotFoundException(userId)
+                );
+
+        workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(
+                        workspaceId,
+                        userToAdd.getId()
+                )
+                .orElseThrow(() ->
+                        new WorkspaceAccessDeniedException(
+                                "User is not a member of this workspace"
+                        )
+                );
+
+        if (channelMemberRepository
+                .existsByChannelIdAndUserId(
+                        channelId,
+                        userId
+                )) {
+            throw new ChannelMembershipConflictException(
+                    "User is already a member of this channel"
+            );
+        }
+
+        ChannelMember channelMember = new ChannelMember();
+        channelMember.setChannel(channel);
+        channelMember.setUser(userToAdd);
+
+        channelMemberRepository.save(channelMember);
+
+        return toResponse(channel);
+    }
+
+    @Transactional
+    public void removeMember(
+            Long workspaceId,
+            Long channelId,
+            Long userId,
+            String currentUserEmail
+    ) {
+        User currentUser = getCurrentUser(currentUserEmail);
+
+        workspaceRepository.findById(workspaceId)
+                .orElseThrow(() ->
+                        new WorkspaceNotFoundException(workspaceId)
+                );
+
+        WorkspaceMember currentMembership = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(
+                        workspaceId,
+                        currentUser.getId()
+                )
+                .orElseThrow(() ->
+                        new WorkspaceAccessDeniedException(
+                                "You are not a member of this workspace"
+                        )
+                );
+
+        if (currentMembership.getRole() != WorkspaceRole.OWNER
+                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
+            throw new WorkspaceAccessDeniedException(
+                    "Only workspace owners and admins can manage channel members"
+            );
+        }
+
+        Channel channel = channelRepository
+                .findByIdAndWorkspaceId(
+                        channelId,
+                        workspaceId
+                )
+                .orElseThrow(() ->
+                        new ChannelNotFoundException(channelId)
+                );
+
+        if (!channel.isPrivateChannel()) {
+            throw new ChannelMembershipConflictException(
+                    "Members can only be managed for private channels"
+            );
+        }
+
+        ChannelMember membership = channelMemberRepository
+                .findByChannelIdAndUserId(
+                        channelId,
+                        userId
+                )
+                .orElseThrow(() ->
+                        new ChannelMembershipConflictException(
+                                "User is not a member of this channel"
+                        )
+                );
+
+        if (channel.getCreatedBy().getId().equals(userId)) {
+            throw new ChannelMembershipConflictException(
+                    "The channel creator cannot be removed"
+            );
+        }
+
+        channelMemberRepository.delete(membership);
+    }
+
+    private User getCurrentUser(String email) {
+        return userRepository
+                .findByEmailIgnoreCase(email)
+                .orElseThrow(
+                        AuthenticatedUserNotFoundException::new
+                );
+    }
+
+    private String generateUniqueSlug(
+            Long workspaceId,
+            String name
+    ) {
         String baseSlug = slugify(name);
         String slug = baseSlug;
 
         int suffix = 2;
 
-        while (channelRepository.existsByWorkspaceIdAndSlug(workspaceId, slug)) {
+        while (channelRepository
+                .existsByWorkspaceIdAndSlug(
+                        workspaceId,
+                        slug
+                )) {
             slug = baseSlug + "-" + suffix;
             suffix++;
         }
@@ -124,7 +308,8 @@ public List<ChannelResponse> getChannels(
     private String slugify(String value) {
         String normalized = Normalizer.normalize(
                 value,
-                Normalizer.Form.NFD);
+                Normalizer.Form.NFD
+        );
 
         normalized = normalized.replaceAll("\\p{M}", "");
 
@@ -155,6 +340,7 @@ public List<ChannelResponse> getChannels(
                 channel.isPrivateChannel(),
                 channel.getCreatedBy().getId(),
                 channel.getCreatedAt(),
-                channel.getUpdatedAt());
+                channel.getUpdatedAt()
+        );
     }
 }
