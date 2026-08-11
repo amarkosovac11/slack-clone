@@ -2,7 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { CreateWorkspaceRequest, WorkspaceResponse } from './workspace.models';
+import {
+  CreateWorkspaceRequest,
+  WorkspaceMember,
+  WorkspaceResponse
+} from './workspace.models';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
@@ -16,5 +20,11 @@ export class WorkspaceService {
 
   createWorkspace(request: CreateWorkspaceRequest): Observable<WorkspaceResponse> {
     return this.http.post<WorkspaceResponse>(this.apiUrl, request);
+  }
+
+  getWorkspaceMembers(workspaceId: number): Observable<WorkspaceMember[]> {
+    return this.http.get<WorkspaceMember[]>(
+      `${this.apiUrl}/${workspaceId}/members`
+    );
   }
 }

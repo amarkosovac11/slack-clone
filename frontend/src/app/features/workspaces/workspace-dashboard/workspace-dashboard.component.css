@@ -424,6 +424,29 @@ form button:disabled {
     font-size: 13px;
 }
 
+.channel-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.manage-members-button {
+    padding: 8px 12px;
+    border: 1px solid #611f69;
+    border-radius: 8px;
+    background: white;
+    color: #611f69;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.manage-members-button:hover {
+    background: #f3e8ff;
+}
+
 .private-badge,
 .public-badge {
     flex: 0 0 auto;
@@ -754,6 +777,170 @@ form button:disabled {
     background: #4a154b !important;
 }
 
+/* CHANNEL MEMBERS MODAL */
+
+.channel-members-modal {
+    width: min(620px, 100%);
+    max-height: min(760px, calc(100vh - 48px));
+    overflow: hidden;
+    border-radius: 16px;
+    background: white;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 25%);
+}
+
+.channel-members-content {
+    display: flex;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    flex-direction: column;
+    gap: 24px;
+    padding: 24px;
+}
+
+.members-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.members-section-heading,
+.member-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.members-section-heading h3 {
+    margin: 0;
+    color: #1f2937;
+    font-size: 15px;
+}
+
+.members-section-heading > span {
+    display: grid;
+    min-width: 24px;
+    height: 24px;
+    place-items: center;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.member-list {
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+.member-row {
+    gap: 16px;
+    padding: 13px 14px;
+}
+
+.member-row + .member-row {
+    border-top: 1px solid #e5e7eb;
+}
+
+.member-info {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.member-name-row {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.member-name,
+.member-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.member-name {
+    color: #1f2937;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.member-email {
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.member-role,
+.creator-badge {
+    flex: 0 0 auto;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.member-role {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.creator-badge {
+    background: #f3e8ff;
+    color: #6b21a8;
+}
+
+.add-member-button,
+.remove-member-button {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    border-radius: 7px;
+    background: white;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.add-member-button {
+    border: 1px solid #611f69;
+    color: #611f69;
+}
+
+.add-member-button:hover:not(:disabled) {
+    background: #f3e8ff;
+}
+
+.remove-member-button {
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+}
+
+.remove-member-button:hover:not(:disabled) {
+    background: #fef2f2;
+}
+
+.add-member-button:disabled,
+.remove-member-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.members-state {
+    padding: 22px;
+    border: 1px dashed #d1d5db;
+    border-radius: 9px;
+    color: #6b7280;
+    font-size: 13px;
+    text-align: center;
+}
+
 /* RESPONSIVE */
 
 @media (max-width: 800px) {
@@ -796,4 +983,18 @@ form button:disabled {
     .channel-header {
         align-items: flex-start;
     }
+
+    .channel-header-actions {
+        align-items: flex-end;
+        flex-direction: column;
+    }
+
+    .channel-members-content {
+        padding: 18px;
+    }
+
+    .member-row {
+        align-items: flex-start;
+    }
+
 }

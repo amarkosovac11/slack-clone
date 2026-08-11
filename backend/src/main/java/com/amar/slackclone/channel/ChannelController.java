@@ -1,6 +1,7 @@
 package com.amar.slackclone.channel;
 
 import com.amar.slackclone.channel.dto.ChannelResponse;
+import com.amar.slackclone.channel.dto.ChannelMemberResponse;
 import com.amar.slackclone.channel.dto.CreateChannelRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -65,6 +66,19 @@ public class ChannelController {
                                 currentUserEmail);
 
                 return ResponseEntity.ok(channel);
+        }
+
+        @GetMapping("/{channelId}/members")
+        public ResponseEntity<List<ChannelMemberResponse>> getChannelMembers(
+                        @PathVariable Long workspaceId,
+                        @PathVariable Long channelId,
+                        Authentication authentication) {
+                List<ChannelMemberResponse> members = channelService.getChannelMembers(
+                                workspaceId,
+                                channelId,
+                                authentication.getName());
+
+                return ResponseEntity.ok(members);
         }
 
         @DeleteMapping("/{channelId}/members/{userId}")

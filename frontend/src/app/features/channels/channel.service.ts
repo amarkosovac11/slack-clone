@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import {
   AddChannelMemberRequest,
   Channel,
+  ChannelMember,
   CreateChannelRequest
 } from './channel.models';
 
@@ -30,6 +31,15 @@ export class ChannelService {
     return this.http.post<Channel>(
       `${this.apiUrl}/${workspaceId}/channels`,
       request
+    );
+  }
+
+  getMembers(
+    workspaceId: number,
+    channelId: number
+  ): Observable<ChannelMember[]> {
+    return this.http.get<ChannelMember[]>(
+      `${this.apiUrl}/${workspaceId}/channels/${channelId}/members`
     );
   }
 

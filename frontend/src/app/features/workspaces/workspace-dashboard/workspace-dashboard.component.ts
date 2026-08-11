@@ -1,16 +1,17 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, computed, signal, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { forkJoin } from 'rxjs';
 
 import { ApiErrorResponse } from '../../../core/auth/auth.models';
 import { AuthService } from '../../../core/auth/auth.service';
 
-import { Channel } from '../../channels/channel.models';  
+import { Channel, ChannelMember } from '../../channels/channel.models';
 import { ChannelService } from '../../channels/channel.service';
 
-import { WorkspaceResponse } from '../workspace.models';
+import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
 
 @Component({
@@ -34,6 +35,26 @@ export class WorkspaceDashboardComponent implements OnInit {
   readonly selectedWorkspaceId = signal<number | null>(null);
   readonly selectedChannel = signal<Channel | null>(null);
 
+  readonly selectedWorkspace = computed(() => {
+    const workspaceId = this.selectedWorkspaceId();
+
+    return this.workspaces().find(
+      (workspace) => workspace.id === workspaceId
+    ) ?? null;
+  });
+
+  readonly selectedWorkspaceRole = computed(
+    () => this.selectedWorkspace()?.currentUserRole ?? null
+  );
+
+  readonly canManageSelectedChannelMembers = computed(() => {
+    const channel = this.selectedChannel();
+    const role = this.selectedWorkspaceRole();
+
+    return channel?.privateChannel === true &&
+      (role === 'OWNER' || role === 'ADMIN');
+  });
+
   readonly channels = signal<Channel[]>([]);
   readonly channelsLoading = signal(false);
   readonly channelsError = signal<string | null>(null);
@@ -41,6 +62,23 @@ export class WorkspaceDashboardComponent implements OnInit {
   readonly showCreateChannelModal = signal(false);
   readonly isCreatingChannel = signal(false);
   readonly channelCreateError = signal<string | null>(null);
+
+  readonly showChannelMembersModal = signal(false);
+  readonly workspaceMembers = signal<WorkspaceMember[]>([]);
+  readonly channelMembers = signal<ChannelMember[]>([]);
+  readonly membersLoading = signal(false);
+  readonly membersError = signal<string | null>(null);
+  readonly memberActionUserId = signal<number | null>(null);
+
+  readonly availableWorkspaceMembers = computed(() => {
+    const channelMemberIds = new Set(
+      this.channelMembers().map((member) => member.userId)
+    );
+
+    return this.workspaceMembers().filter(
+      (member) => !channelMemberIds.has(member.userId)
+    );
+  });
 
   readonly createForm = this.formBuilder.nonNullable.group({
     name: [
@@ -86,6 +124,7 @@ export class WorkspaceDashboardComponent implements OnInit {
   }
 
   selectWorkspace(workspaceId: number): void {
+    this.resetChannelMembersModal();
     this.selectedWorkspaceId.set(workspaceId);
     this.selectedChannel.set(null);
 
@@ -111,6 +150,7 @@ export class WorkspaceDashboardComponent implements OnInit {
   }
 
   selectChannel(channel: Channel): void {
+    this.resetChannelMembersModal();
     this.selectedChannel.set(channel);
   }
 
@@ -191,6 +231,133 @@ export class WorkspaceDashboardComponent implements OnInit {
           this.isCreatingChannel.set(false);
         },
       });
+  }
+
+  openChannelMembersModal(): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+
+    if (
+      workspaceId === null ||
+      channel === null ||
+      !this.canManageSelectedChannelMembers()
+    ) {
+      return;
+    }
+
+    this.membersError.set(null);
+    this.workspaceMembers.set([]);
+    this.channelMembers.set([]);
+    this.showChannelMembersModal.set(true);
+    this.membersLoading.set(true);
+
+    forkJoin({
+      workspaceMembers: this.workspaceService.getWorkspaceMembers(workspaceId),
+      channelMembers: this.channelService.getMembers(workspaceId, channel.id),
+    }).subscribe({
+      next: ({ workspaceMembers, channelMembers }) => {
+        this.workspaceMembers.set(workspaceMembers);
+        this.channelMembers.set(channelMembers);
+        this.membersLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as ApiErrorResponse | undefined;
+
+        this.membersError.set(
+          apiError?.message ?? 'Could not load channel members.'
+        );
+        this.membersLoading.set(false);
+      },
+    });
+  }
+
+  closeChannelMembersModal(): void {
+    if (this.memberActionUserId() !== null) {
+      return;
+    }
+
+    this.showChannelMembersModal.set(false);
+    this.membersError.set(null);
+  }
+
+  addChannelMember(userId: number): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+
+    if (
+      workspaceId === null ||
+      channel === null ||
+      this.memberActionUserId() !== null ||
+      !this.canManageSelectedChannelMembers()
+    ) {
+      return;
+    }
+
+    this.membersError.set(null);
+    this.memberActionUserId.set(userId);
+
+    this.channelService.addMember(workspaceId, channel.id, userId).subscribe({
+      next: () => this.reloadChannelMembers(workspaceId, channel.id),
+      error: (error: HttpErrorResponse) => {
+        this.handleMemberActionError(error, 'Could not add channel member.');
+      },
+    });
+  }
+
+  removeChannelMember(userId: number): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+
+    if (
+      workspaceId === null ||
+      channel === null ||
+      userId === channel.createdById ||
+      this.memberActionUserId() !== null ||
+      !this.canManageSelectedChannelMembers()
+    ) {
+      return;
+    }
+
+    this.membersError.set(null);
+    this.memberActionUserId.set(userId);
+
+    this.channelService.removeMember(workspaceId, channel.id, userId).subscribe({
+      next: () => this.reloadChannelMembers(workspaceId, channel.id),
+      error: (error: HttpErrorResponse) => {
+        this.handleMemberActionError(error, 'Could not remove channel member.');
+      },
+    });
+  }
+
+  private reloadChannelMembers(workspaceId: number, channelId: number): void {
+    this.channelService.getMembers(workspaceId, channelId).subscribe({
+      next: (members) => {
+        this.channelMembers.set(members);
+        this.memberActionUserId.set(null);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.handleMemberActionError(error, 'Could not refresh channel members.');
+      },
+    });
+  }
+
+  private handleMemberActionError(
+    error: HttpErrorResponse,
+    fallbackMessage: string
+  ): void {
+    const apiError = error.error as ApiErrorResponse | undefined;
+
+    this.membersError.set(apiError?.message ?? fallbackMessage);
+    this.memberActionUserId.set(null);
+  }
+
+  private resetChannelMembersModal(): void {
+    this.showChannelMembersModal.set(false);
+    this.workspaceMembers.set([]);
+    this.channelMembers.set([]);
+    this.membersLoading.set(false);
+    this.membersError.set(null);
+    this.memberActionUserId.set(null);
   }
 
   loadCurrentUser(): void {

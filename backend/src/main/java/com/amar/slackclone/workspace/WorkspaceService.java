@@ -1,10 +1,14 @@
 package com.amar.slackclone.workspace;
 
 import com.amar.slackclone.auth.InvalidCredentialsException;
+import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
+import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
+import com.amar.slackclone.channel.WorkspaceNotFoundException;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.dto.CreateWorkspaceRequest;
 import com.amar.slackclone.workspace.dto.WorkspaceResponse;
+import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,6 +85,45 @@ public List<WorkspaceResponse> getCurrentUserWorkspaces(
             .stream()
             .map(this::toWorkspaceResponse)
             .toList();
+}
+
+@Transactional(readOnly = true)
+public List<WorkspaceMemberResponse> getWorkspaceMembers(
+        Long workspaceId,
+        String authenticatedEmail
+) {
+    User currentUser = userRepository
+            .findByEmailIgnoreCase(authenticatedEmail)
+            .orElseThrow(AuthenticatedUserNotFoundException::new);
+
+    workspaceRepository.findById(workspaceId)
+            .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
+
+    workspaceMemberRepository
+            .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
+            .orElseThrow(() -> new WorkspaceAccessDeniedException(
+                    "You are not a member of this workspace"
+            ));
+
+    return workspaceMemberRepository
+            .findAllByWorkspaceId(workspaceId)
+            .stream()
+            .map(this::toWorkspaceMemberResponse)
+            .toList();
+}
+
+private WorkspaceMemberResponse toWorkspaceMemberResponse(
+        WorkspaceMember membership
+) {
+    User user = membership.getUser();
+
+    return new WorkspaceMemberResponse(
+            user.getId(),
+            user.getDisplayName(),
+            user.getEmail(),
+            membership.getRole(),
+            membership.getJoinedAt()
+    );
 }
 
 private WorkspaceResponse toWorkspaceResponse(
