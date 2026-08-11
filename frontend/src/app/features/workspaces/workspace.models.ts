@@ -13,3 +13,11 @@ export interface WorkspaceResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface WorkspaceMember {
+  userId: number;
+  displayName: string;
+  email: string;
+  role: WorkspaceRole;
+  joinedAt: string;
+}

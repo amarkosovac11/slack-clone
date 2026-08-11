@@ -196,9 +196,21 @@
       </div>
 
       @if (selectedChannel()!.privateChannel) {
-      <span class="private-badge">
-        Private
-      </span>
+      <div class="channel-header-actions">
+        <span class="private-badge">
+          Private
+        </span>
+
+        @if (canManageSelectedChannelMembers()) {
+        <button
+          type="button"
+          class="manage-members-button"
+          (click)="openChannelMembersModal()"
+        >
+          Manage members
+        </button>
+        }
+      </div>
       } @else {
       <span class="public-badge">
         Public
@@ -266,6 +278,132 @@
   </main>
 
 </section>
+
+}
+
+@if (showChannelMembersModal()) {
+
+<div
+  class="modal-backdrop"
+  (click)="closeChannelMembersModal()"
+>
+  <div
+    class="channel-members-modal"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="modal-header">
+      <div>
+        <h2>Manage members</h2>
+        <p>{{ selectedChannel()?.name }}</p>
+      </div>
+
+      <button
+        type="button"
+        class="modal-close-button"
+        aria-label="Close manage members modal"
+        [disabled]="memberActionUserId() !== null"
+        (click)="closeChannelMembersModal()"
+      >
+        Ã—
+      </button>
+    </div>
+
+    <div class="channel-members-content">
+      @if (membersError()) {
+      <div class="modal-error">
+        {{ membersError() }}
+      </div>
+      }
+
+      @if (membersLoading()) {
+      <div class="members-state">
+        Loading members...
+      </div>
+      } @else {
+      <section class="members-section">
+        <div class="members-section-heading">
+          <h3>Current members</h3>
+          <span>{{ channelMembers().length }}</span>
+        </div>
+
+        @if (channelMembers().length === 0) {
+        <div class="members-state">
+          This channel has no members.
+        </div>
+        } @else {
+        <div class="member-list">
+          @for (member of channelMembers(); track member.userId) {
+          <div class="member-row">
+            <div class="member-info">
+              <div class="member-name-row">
+                <span class="member-name">{{ member.displayName }}</span>
+
+                @if (member.userId === selectedChannel()?.createdById) {
+                <span class="creator-badge">Creator</span>
+                } @else {
+                <span class="member-role">Member</span>
+                }
+              </div>
+
+              <span class="member-email">{{ member.email }}</span>
+            </div>
+
+            @if (member.userId !== selectedChannel()?.createdById) {
+            <button
+              type="button"
+              class="remove-member-button"
+              [disabled]="memberActionUserId() !== null"
+              (click)="removeChannelMember(member.userId)"
+            >
+              {{ memberActionUserId() === member.userId ? 'Removing...' : 'Remove' }}
+            </button>
+            }
+          </div>
+          }
+        </div>
+        }
+      </section>
+
+      <section class="members-section">
+        <div class="members-section-heading">
+          <h3>Available workspace members</h3>
+          <span>{{ availableWorkspaceMembers().length }}</span>
+        </div>
+
+        @if (availableWorkspaceMembers().length === 0) {
+        <div class="members-state">
+          All workspace members are already in this channel.
+        </div>
+        } @else {
+        <div class="member-list">
+          @for (member of availableWorkspaceMembers(); track member.userId) {
+          <div class="member-row">
+            <div class="member-info">
+              <div class="member-name-row">
+                <span class="member-name">{{ member.displayName }}</span>
+                <span class="member-role">{{ member.role }}</span>
+              </div>
+
+              <span class="member-email">{{ member.email }}</span>
+            </div>
+
+            <button
+              type="button"
+              class="add-member-button"
+              [disabled]="memberActionUserId() !== null"
+              (click)="addChannelMember(member.userId)"
+            >
+              {{ memberActionUserId() === member.userId ? 'Adding...' : 'Add' }}
+            </button>
+          </div>
+          }
+        </div>
+        }
+      </section>
+      }
+    </div>
+  </div>
+</div>
 
 }
 

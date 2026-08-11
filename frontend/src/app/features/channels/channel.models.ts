@@ -19,3 +19,10 @@ export interface CreateChannelRequest {
 export interface AddChannelMemberRequest {
   userId: number;
 }
+
+export interface ChannelMember {
+  userId: number;
+  displayName: string;
+  email: string;
+  joinedAt: string;
+}
