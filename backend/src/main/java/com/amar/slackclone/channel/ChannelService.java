@@ -1,6 +1,7 @@
 package com.amar.slackclone.channel;
 
 import com.amar.slackclone.channel.dto.ChannelResponse;
+import com.amar.slackclone.channel.dto.ChannelMemberResponse;
 import com.amar.slackclone.channel.dto.CreateChannelRequest;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
@@ -274,6 +275,60 @@ public class ChannelService {
         }
 
         channelMemberRepository.delete(membership);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChannelMemberResponse> getChannelMembers(
+            Long workspaceId,
+            Long channelId,
+            String authenticatedEmail
+    ) {
+        User currentUser = getCurrentUser(authenticatedEmail);
+
+        workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
+
+        WorkspaceMember currentMembership = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
+                .orElseThrow(() -> new WorkspaceAccessDeniedException(
+                        "You are not a member of this workspace"
+                ));
+
+        Channel channel = channelRepository
+                .findByIdAndWorkspaceId(channelId, workspaceId)
+                .orElseThrow(() -> new ChannelNotFoundException(channelId));
+
+        if (currentMembership.getRole() != WorkspaceRole.OWNER
+                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
+            throw new WorkspaceAccessDeniedException(
+                    "Only workspace owners and admins can manage channel members"
+            );
+        }
+
+        if (!channel.isPrivateChannel()) {
+            throw new ChannelMembershipConflictException(
+                    "Members can only be managed for private channels"
+            );
+        }
+
+        return channelMemberRepository
+                .findAllByChannelId(channelId)
+                .stream()
+                .map(this::toChannelMemberResponse)
+                .toList();
+    }
+
+    private ChannelMemberResponse toChannelMemberResponse(
+            ChannelMember membership
+    ) {
+        User user = membership.getUser();
+
+        return new ChannelMemberResponse(
+                user.getId(),
+                user.getDisplayName(),
+                user.getEmail(),
+                membership.getJoinedAt()
+        );
     }
 
     private User getCurrentUser(String email) {

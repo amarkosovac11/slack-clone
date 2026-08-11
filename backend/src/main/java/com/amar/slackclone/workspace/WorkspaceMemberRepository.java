@@ -15,6 +15,7 @@ public interface WorkspaceMemberRepository
         })
         List<WorkspaceMember> findAllByUserId(Long userId);
 
+        @EntityGraph(attributePaths = "user")
         List<WorkspaceMember> findAllByWorkspaceId(Long workspaceId);
 
         Optional<WorkspaceMember> findByWorkspaceIdAndUserId(
