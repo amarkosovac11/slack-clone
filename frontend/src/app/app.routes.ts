@@ -4,6 +4,7 @@ import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'workspaces' },
+
   {
     path: 'login',
     loadComponent: () =>
@@ -11,6 +12,7 @@ export const routes: Routes = [
         (component) => component.LoginComponent,
       ),
   },
+
   {
     path: 'register',
     loadComponent: () =>
@@ -18,6 +20,16 @@ export const routes: Routes = [
         (component) => component.RegisterComponent,
       ),
   },
+
+  {
+    path: 'workspaces/:workspaceId/channels/:channelId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import(
+        './features/workspaces/workspace-dashboard/workspace-dashboard.component'
+      ).then((component) => component.WorkspaceDashboardComponent),
+  },
+
   {
     path: 'workspaces',
     canActivate: [authGuard],
@@ -26,5 +38,6 @@ export const routes: Routes = [
         './features/workspaces/workspace-dashboard/workspace-dashboard.component'
       ).then((component) => component.WorkspaceDashboardComponent),
   },
+
   { path: '**', redirectTo: 'workspaces' },
 ];
