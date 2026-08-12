@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, signal, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { ApiErrorResponse } from '../../../core/auth/auth.models';
@@ -110,48 +110,112 @@ export class WorkspaceDashboardComponent implements OnInit {
   });
 
   constructor(
-  private readonly workspaceService: WorkspaceService,
-  private readonly authService: AuthService,
-  private readonly router: Router,
-  private readonly channelService: ChannelService,
-) {
-  this.currentUser = this.authService.currentUser;
-}
+    private readonly workspaceService: WorkspaceService,
+    private readonly authService: AuthService,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    private readonly channelService: ChannelService,
+  ) {
+    this.currentUser = this.authService.currentUser;
+  }
+  private syncSelectionFromRoute(): void {
+    const workspaceId = this.parsePositiveRouteId(
+      this.route.snapshot.paramMap.get('workspaceId')
+    );
+
+    const channelId = this.parsePositiveRouteId(
+      this.route.snapshot.paramMap.get('channelId')
+    );
+
+    // Base /workspaces ruta.
+    if (workspaceId === null && channelId === null) {
+      return;
+    }
+
+    // Ako samo jedan parametar postoji ili je nevalidan,
+    // URL nije validan za channel route.
+    if (workspaceId === null || channelId === null) {
+      void this.router.navigate(['/workspaces']);
+      return;
+    }
+
+    const workspaceExists = this.workspaces().some(
+      (workspace) => workspace.id === workspaceId
+    );
+
+    if (!workspaceExists) {
+      void this.router.navigate(['/workspaces']);
+      return;
+    }
+
+    // Ako su kanali tog workspacea već učitani,
+    // nema potrebe za novim HTTP requestom.
+    if (
+      this.selectedWorkspaceId() === workspaceId &&
+      !this.channelsLoading() &&
+      this.channels().length > 0
+    ) {
+      const channel = this.channels().find(
+        (currentChannel) => currentChannel.id === channelId
+      );
+
+      if (!channel) {
+        void this.router.navigate(['/workspaces']);
+        return;
+      }
+
+      this.resetChannelMembersModal();
+      this.selectedChannel.set(channel);
+      return;
+    }
+
+    this.loadWorkspaceChannels(workspaceId, channelId);
+  }
+  private parsePositiveRouteId(value: string | null): number | null {
+    if (value === null) {
+      return null;
+    }
+
+    const id = Number(value);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return null;
+    }
+
+    return id;
+  }
 
   ngOnInit(): void {
     this.loadCurrentUser();
+
+    this.route.paramMap.subscribe(() => {
+      if (!this.isLoading()) {
+        this.syncSelectionFromRoute();
+      }
+    });
+
     this.loadWorkspaces();
   }
 
   selectWorkspace(workspaceId: number): void {
-    this.resetChannelMembersModal();
-    this.selectedWorkspaceId.set(workspaceId);
-    this.selectedChannel.set(null);
-
-    this.channels.set([]);
-    this.channelsError.set(null);
-    this.channelsLoading.set(true);
-
-    this.channelService.getChannels(workspaceId).subscribe({
-      next: (channels) => {
-        this.channels.set(channels);
-        this.channelsLoading.set(false);
-      },
-      error: (error: HttpErrorResponse) => {
-        const apiError = error.error as ApiErrorResponse | undefined;
-
-        this.channelsError.set(
-          apiError?.message ?? 'Failed to load channels.'
-        );
-
-        this.channelsLoading.set(false);
-      },
+    void this.router.navigate(['/workspaces']).then(() => {
+      this.loadWorkspaceChannels(workspaceId);
     });
   }
 
   selectChannel(channel: Channel): void {
-    this.resetChannelMembersModal();
-    this.selectedChannel.set(channel);
+    const workspaceId = this.selectedWorkspaceId();
+
+    if (workspaceId === null) {
+      return;
+    }
+
+    void this.router.navigate([
+      '/workspaces',
+      workspaceId,
+      'channels',
+      channel.id,
+    ]);
   }
 
   isWorkspaceSelected(workspaceId: number): boolean {
@@ -210,7 +274,7 @@ export class WorkspaceDashboardComponent implements OnInit {
             channel,
           ]);
 
-          this.selectedChannel.set(channel);
+
 
           this.createChannelForm.reset({
             name: '',
@@ -220,6 +284,13 @@ export class WorkspaceDashboardComponent implements OnInit {
 
           this.isCreatingChannel.set(false);
           this.showCreateChannelModal.set(false);
+
+          void this.router.navigate([
+            '/workspaces',
+            workspaceId,
+            'channels',
+            channel.id,
+          ]);
         },
         error: (error: HttpErrorResponse) => {
           const apiError = error.error as ApiErrorResponse | undefined;
@@ -369,6 +440,61 @@ export class WorkspaceDashboardComponent implements OnInit {
       error: () => this.logout(),
     });
   }
+  private loadWorkspaceChannels(
+    workspaceId: number,
+    channelId: number | null = null
+  ): void {
+    this.resetChannelMembersModal();
+
+    this.selectedWorkspaceId.set(workspaceId);
+    this.selectedChannel.set(null);
+
+    this.channels.set([]);
+    this.channelsError.set(null);
+    this.channelsLoading.set(true);
+
+    this.channelService.getChannels(workspaceId).subscribe({
+      next: (channels) => {
+        // Ako je user u međuvremenu promijenio workspace,
+        // ignoriši stari HTTP response.
+        if (this.selectedWorkspaceId() !== workspaceId) {
+          return;
+        }
+
+        this.channels.set(channels);
+        this.channelsLoading.set(false);
+
+        if (channelId === null) {
+          return;
+        }
+
+        const channel = channels.find(
+          (currentChannel) => currentChannel.id === channelId
+        );
+
+        if (!channel) {
+          void this.router.navigate(['/workspaces']);
+          return;
+        }
+
+        this.selectedChannel.set(channel);
+      },
+
+      error: (error: HttpErrorResponse) => {
+        if (this.selectedWorkspaceId() !== workspaceId) {
+          return;
+        }
+
+        const apiError = error.error as ApiErrorResponse | undefined;
+
+        this.channelsError.set(
+          apiError?.message ?? 'Failed to load channels.'
+        );
+
+        this.channelsLoading.set(false);
+      },
+    });
+  }
 
   loadWorkspaces(): void {
     this.isLoading.set(true);
@@ -378,6 +504,8 @@ export class WorkspaceDashboardComponent implements OnInit {
       next: (workspaces) => {
         this.workspaces.set(workspaces);
         this.isLoading.set(false);
+
+        this.syncSelectionFromRoute();
       },
       error: () => {
         this.errorMessage.set('Could not load workspaces.');
