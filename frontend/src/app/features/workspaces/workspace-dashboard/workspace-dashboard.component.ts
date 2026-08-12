@@ -10,6 +10,8 @@ import { AuthService } from '../../../core/auth/auth.service';
 
 import { Channel, ChannelMember } from '../../channels/channel.models';
 import { ChannelService } from '../../channels/channel.service';
+import { Message } from '../../messages/message.models';
+import { MessageService } from '../../messages/message.service';
 
 import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
@@ -58,6 +60,11 @@ export class WorkspaceDashboardComponent implements OnInit {
   readonly channels = signal<Channel[]>([]);
   readonly channelsLoading = signal(false);
   readonly channelsError = signal<string | null>(null);
+
+  readonly messages = signal<Message[]>([]);
+  readonly messagesLoading = signal(false);
+  readonly messagesError = signal<string | null>(null);
+  readonly isSendingMessage = signal(false);
 
   readonly showCreateChannelModal = signal(false);
   readonly isCreatingChannel = signal(false);
@@ -109,12 +116,23 @@ export class WorkspaceDashboardComponent implements OnInit {
     privateChannel: [false],
   });
 
+  readonly messageForm = this.formBuilder.nonNullable.group({
+    content: [
+      '',
+      [
+        Validators.required,
+        Validators.maxLength(4000),
+      ],
+    ],
+  });
+
   constructor(
     private readonly workspaceService: WorkspaceService,
     private readonly authService: AuthService,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
     private readonly channelService: ChannelService,
+    private readonly messageService: MessageService,
   ) {
     this.currentUser = this.authService.currentUser;
   }
@@ -166,6 +184,7 @@ export class WorkspaceDashboardComponent implements OnInit {
 
       this.resetChannelMembersModal();
       this.selectedChannel.set(channel);
+      this.loadMessages(workspaceId, channel.id);
       return;
     }
 
@@ -300,6 +319,65 @@ export class WorkspaceDashboardComponent implements OnInit {
           );
 
           this.isCreatingChannel.set(false);
+        },
+      });
+  }
+
+  sendMessage(): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+
+    if (workspaceId === null || channel === null) {
+      return;
+    }
+
+    this.messagesError.set(null);
+
+    if (this.messageForm.invalid) {
+      this.messageForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.messageForm.getRawValue();
+    const content = value.content.trim();
+
+    if (!content) {
+      this.messageForm.controls.content.setErrors({ required: true });
+      this.messageForm.controls.content.markAsTouched();
+      return;
+    }
+
+    this.isSendingMessage.set(true);
+
+    this.messageService
+      .createMessage(workspaceId, channel.id, { content })
+      .subscribe({
+        next: (message) => {
+          if (
+            this.selectedWorkspaceId() !== workspaceId ||
+            this.selectedChannel()?.id !== channel.id
+          ) {
+            return;
+          }
+
+          this.messages.update((current) => [...current, message]);
+          this.messageForm.reset({ content: '' });
+          this.isSendingMessage.set(false);
+        },
+        error: (error: HttpErrorResponse) => {
+          if (
+            this.selectedWorkspaceId() !== workspaceId ||
+            this.selectedChannel()?.id !== channel.id
+          ) {
+            return;
+          }
+
+          const apiError = error.error as ApiErrorResponse | undefined;
+
+          this.messagesError.set(
+            apiError?.message ?? 'Could not send message.'
+          );
+          this.isSendingMessage.set(false);
         },
       });
   }
@@ -449,6 +527,12 @@ export class WorkspaceDashboardComponent implements OnInit {
     this.selectedWorkspaceId.set(workspaceId);
     this.selectedChannel.set(null);
 
+    this.messages.set([]);
+    this.messagesError.set(null);
+    this.messagesLoading.set(false);
+    this.messageForm.reset({ content: '' });
+    this.isSendingMessage.set(false);
+
     this.channels.set([]);
     this.channelsError.set(null);
     this.channelsLoading.set(true);
@@ -478,6 +562,7 @@ export class WorkspaceDashboardComponent implements OnInit {
         }
 
         this.selectedChannel.set(channel);
+        this.loadMessages(workspaceId, channel.id);
       },
 
       error: (error: HttpErrorResponse) => {
@@ -492,6 +577,43 @@ export class WorkspaceDashboardComponent implements OnInit {
         );
 
         this.channelsLoading.set(false);
+      },
+    });
+  }
+
+  private loadMessages(workspaceId: number, channelId: number): void {
+    this.messages.set([]);
+    this.messagesError.set(null);
+    this.messagesLoading.set(true);
+    this.messageForm.reset({ content: '' });
+    this.isSendingMessage.set(false);
+
+    this.messageService.getMessages(workspaceId, channelId).subscribe({
+      next: (messages) => {
+        if (
+          this.selectedWorkspaceId() !== workspaceId ||
+          this.selectedChannel()?.id !== channelId
+        ) {
+          return;
+        }
+
+        this.messages.set(messages);
+        this.messagesLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        if (
+          this.selectedWorkspaceId() !== workspaceId ||
+          this.selectedChannel()?.id !== channelId
+        ) {
+          return;
+        }
+
+        const apiError = error.error as ApiErrorResponse | undefined;
+
+        this.messagesError.set(
+          apiError?.message ?? 'Could not load messages.'
+        );
+        this.messagesLoading.set(false);
       },
     });
   }

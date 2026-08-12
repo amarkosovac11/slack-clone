@@ -219,43 +219,97 @@
 
     </header>
 
-    <div class="channel-body">
+    <div class="message-area">
+      @if (messagesLoading()) {
+      <div class="messages-state">Loading messages...</div>
+      }
 
-      <div class="channel-welcome">
+      @if (messagesError()) {
+      <div class="messages-state messages-error">{{ messagesError() }}</div>
+      }
+
+      @if (!messagesLoading() && messages().length === 0) {
+      <div class="message-empty-state">
 
         <div class="welcome-icon">
           {{ selectedChannel()!.privateChannel ? '🔒' : '#' }}
         </div>
 
         <h1>
-          Welcome to {{ selectedChannel()!.name }}
+          Welcome to #{{ selectedChannel()!.name }}
         </h1>
 
-        <p>
-          This is the beginning of the
-          <strong>{{ selectedChannel()!.name }}</strong>
-          channel.
-        </p>
+        @if (selectedChannel()!.description) {
+        <p>{{ selectedChannel()!.description }}</p>
+        }
 
         <span>
-          Messages will appear here when messaging is implemented.
+          This is the beginning of this channel.
         </span>
 
       </div>
+      }
+
+      @if (messages().length > 0) {
+      <div class="message-list">
+        @for (message of messages(); track message.id) {
+        <article class="message-row">
+          <div class="message-avatar" aria-hidden="true">
+            {{ message.senderDisplayName.charAt(0).toUpperCase() }}
+          </div>
+
+          <div class="message-content">
+            <div class="message-meta">
+              <span class="message-sender">{{ message.senderDisplayName }}</span>
+              <time class="message-time" [attr.datetime]="message.createdAt">
+                {{ message.createdAt | date:'shortTime' }}
+              </time>
+            </div>
+            <p class="message-text">{{ message.content }}</p>
+          </div>
+        </article>
+        }
+      </div>
+      }
 
     </div>
 
-    <div class="message-composer-placeholder">
+    <form
+      class="message-composer"
+      [formGroup]="messageForm"
+      (ngSubmit)="sendMessage()"
+    >
+      <textarea
+        formControlName="content"
+        rows="2"
+        maxlength="4000"
+        [placeholder]="'Message #' + selectedChannel()!.name"
+        [disabled]="isSendingMessage()"
+      ></textarea>
 
-      <span>
-        Message #{{ selectedChannel()!.name }}
-      </span>
+      <div class="message-composer-footer">
+        <div>
+          @if (
+            messageForm.controls.content.touched &&
+            messageForm.controls.content.hasError('required')
+          ) {
+          <small class="field-error">A message is required.</small>
+          } @else if (
+            messageForm.controls.content.touched &&
+            messageForm.controls.content.hasError('maxlength')
+          ) {
+          <small class="field-error">Messages cannot exceed 4000 characters.</small>
+          }
+        </div>
 
-      <button type="button" disabled>
-        Send
-      </button>
-
-    </div>
+        <button
+          type="submit"
+          [disabled]="isSendingMessage() || messageForm.invalid"
+        >
+          {{ isSendingMessage() ? 'Sending...' : 'Send' }}
+        </button>
+      </div>
+    </form>
 
     } @else {
 
