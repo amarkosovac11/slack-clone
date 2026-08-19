@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, computed, signal, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -12,6 +12,7 @@ import { Channel, ChannelMember } from '../../channels/channel.models';
 import { ChannelService } from '../../channels/channel.service';
 import { Message } from '../../messages/message.models';
 import { MessageService } from '../../messages/message.service';
+import { MessageWebSocketService } from '../../messages/message-websocket.service';
 
 import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
@@ -23,7 +24,7 @@ import { WorkspaceService } from '../workspace.service';
   templateUrl: './workspace-dashboard.component.html',
   styleUrl: './workspace-dashboard.component.css',
 })
-export class WorkspaceDashboardComponent implements OnInit {
+export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   private readonly formBuilder = inject(FormBuilder);
 
@@ -65,6 +66,7 @@ export class WorkspaceDashboardComponent implements OnInit {
   readonly messagesLoading = signal(false);
   readonly messagesError = signal<string | null>(null);
   readonly isSendingMessage = signal(false);
+  readonly webSocketConnected: MessageWebSocketService['connected'];
 
   readonly showCreateChannelModal = signal(false);
   readonly isCreatingChannel = signal(false);
@@ -133,8 +135,10 @@ export class WorkspaceDashboardComponent implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly channelService: ChannelService,
     private readonly messageService: MessageService,
+    private readonly messageWebSocketService: MessageWebSocketService,
   ) {
     this.currentUser = this.authService.currentUser;
+    this.webSocketConnected = this.messageWebSocketService.connected;
   }
   private syncSelectionFromRoute(): void {
     const workspaceId = this.parsePositiveRouteId(
@@ -214,6 +218,10 @@ export class WorkspaceDashboardComponent implements OnInit {
     });
 
     this.loadWorkspaces();
+  }
+
+  ngOnDestroy(): void {
+    this.messageWebSocketService.disconnect();
   }
 
   selectWorkspace(workspaceId: number): void {
@@ -360,7 +368,7 @@ export class WorkspaceDashboardComponent implements OnInit {
             return;
           }
 
-          this.messages.update((current) => [...current, message]);
+          this.appendMessageIfAbsent(message);
           this.messageForm.reset({ content: '' });
           this.isSendingMessage.set(false);
         },
@@ -522,6 +530,7 @@ export class WorkspaceDashboardComponent implements OnInit {
     workspaceId: number,
     channelId: number | null = null
   ): void {
+    this.messageWebSocketService.unsubscribeFromChannel();
     this.resetChannelMembersModal();
 
     this.selectedWorkspaceId.set(workspaceId);
@@ -582,6 +591,20 @@ export class WorkspaceDashboardComponent implements OnInit {
   }
 
   private loadMessages(workspaceId: number, channelId: number): void {
+    this.messageWebSocketService.subscribeToChannel(
+      workspaceId,
+      channelId,
+      (message) => {
+        if (
+          this.selectedWorkspaceId() === workspaceId &&
+          this.selectedChannel()?.id === channelId &&
+          message.channelId === channelId
+        ) {
+          this.appendMessageIfAbsent(message);
+        }
+      },
+    );
+
     this.messages.set([]);
     this.messagesError.set(null);
     this.messagesLoading.set(true);
@@ -597,7 +620,12 @@ export class WorkspaceDashboardComponent implements OnInit {
           return;
         }
 
-        this.messages.set(messages);
+        const historyIds = new Set(messages.map((message) => message.id));
+        const messagesReceivedDuringLoad = this.messages().filter(
+          (message) => !historyIds.has(message.id)
+        );
+
+        this.messages.set([...messages, ...messagesReceivedDuringLoad]);
         this.messagesLoading.set(false);
       },
       error: (error: HttpErrorResponse) => {
@@ -671,7 +699,16 @@ export class WorkspaceDashboardComponent implements OnInit {
   }
 
   logout(): void {
+    this.messageWebSocketService.disconnect();
     this.authService.logout();
     void this.router.navigate(['/login']);
+  }
+
+  private appendMessageIfAbsent(message: Message): void {
+    this.messages.update((current) =>
+      current.some((existing) => existing.id === message.id)
+        ? current
+        : [...current, message]
+    );
   }
 }
