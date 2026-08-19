@@ -1,21 +1,17 @@
 package com.amar.slackclone.message;
 
 import com.amar.slackclone.channel.Channel;
-import com.amar.slackclone.channel.ChannelMemberRepository;
-import com.amar.slackclone.channel.ChannelNotFoundException;
-import com.amar.slackclone.channel.ChannelRepository;
+import com.amar.slackclone.channel.ChannelAccessService;
 import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
-import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
-import com.amar.slackclone.channel.WorkspaceNotFoundException;
 import com.amar.slackclone.message.dto.CreateMessageRequest;
 import com.amar.slackclone.message.dto.MessageResponse;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
-import com.amar.slackclone.workspace.WorkspaceMemberRepository;
-import com.amar.slackclone.workspace.WorkspaceRepository;
-
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -23,26 +19,20 @@ import java.util.List;
 public class MessageService {
 
     private final MessageRepository messageRepository;
-    private final ChannelRepository channelRepository;
-    private final ChannelMemberRepository channelMemberRepository;
-    private final WorkspaceRepository workspaceRepository;
-    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final ChannelAccessService channelAccessService;
     private final UserRepository userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public MessageService(
         MessageRepository messageRepository,
-        ChannelRepository channelRepository,
-        ChannelMemberRepository channelMemberRepository,
-        WorkspaceRepository workspaceRepository,
-        WorkspaceMemberRepository workspaceMemberRepository,
-        UserRepository userRepository
+        ChannelAccessService channelAccessService,
+        UserRepository userRepository,
+        SimpMessagingTemplate messagingTemplate
     ) {
         this.messageRepository = messageRepository;
-        this.channelRepository = channelRepository;
-        this.channelMemberRepository = channelMemberRepository;
-        this.workspaceRepository = workspaceRepository;
-        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.channelAccessService = channelAccessService;
         this.userRepository = userRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -51,12 +41,10 @@ public class MessageService {
         Long channelId,
         String authenticatedEmail
     ) {
-        User authenticatedUser = getAuthenticatedUser(authenticatedEmail);
-
-        validateChannelAccess(
+        channelAccessService.validateChannelAccess(
             workspaceId,
             channelId,
-            authenticatedUser.getId()
+            authenticatedEmail
         );
 
         return messageRepository
@@ -75,10 +63,10 @@ public class MessageService {
     ) {
         User authenticatedUser = getAuthenticatedUser(authenticatedEmail);
 
-        Channel channel = validateChannelAccess(
+        Channel channel = channelAccessService.validateChannelAccess(
             workspaceId,
             channelId,
-            authenticatedUser.getId()
+            authenticatedEmail
         );
 
         Message message = new Message();
@@ -86,51 +74,28 @@ public class MessageService {
         message.setSender(authenticatedUser);
         message.setContent(request.content().trim());
 
-        Message savedMessage = messageRepository.save(message);
-
-        return toMessageResponse(savedMessage);
+        MessageResponse response = toMessageResponse(messageRepository.save(message));
+        broadcastAfterCommit(workspaceId, channelId, response);
+        return response;
     }
 
-    private Channel validateChannelAccess(
+    private void broadcastAfterCommit(
         Long workspaceId,
         Long channelId,
-        Long userId
+        MessageResponse response
     ) {
-        if (!workspaceRepository.existsById(workspaceId)) {
-            throw new WorkspaceNotFoundException(workspaceId);
-        }
-
-        boolean workspaceMember =
-            workspaceMemberRepository.existsByWorkspaceIdAndUserId(
-                workspaceId,
-                userId
-            );
-
-        if (!workspaceMember) {
-            throw new WorkspaceAccessDeniedException(
-                "You do not have access to this workspace"
-            );
-        }
-
-        Channel channel = channelRepository
-            .findByIdAndWorkspaceId(channelId, workspaceId)
-            .orElseThrow(() ->
-                new ChannelNotFoundException(channelId)
-            );
-
-        if (
-            channel.isPrivateChannel() &&
-            !channelMemberRepository.existsByChannelIdAndUserId(
-                channelId,
-                userId
-            )
-        ) {
-            throw new WorkspaceAccessDeniedException(
-                "You do not have access to this private channel"
-            );
-        }
-
-        return channel;
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagingTemplate.convertAndSend(
+                        "/topic/workspaces/%d/channels/%d/messages"
+                            .formatted(workspaceId, channelId),
+                        response
+                    );
+                }
+            }
+        );
     }
 
     private User getAuthenticatedUser(String authenticatedEmail) {
