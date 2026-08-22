@@ -19,7 +19,7 @@ export class PendingWorkspaceInvitationsComponent implements OnInit {
   readonly invitations = signal<WorkspaceInvitation[]>([]);
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
-  readonly actionInvitationId = signal<number | null>(null);
+  readonly actionInvitationIds = signal<ReadonlySet<number>>(new Set());
 
   constructor(
     private readonly invitationService: WorkspaceInvitationService,
@@ -30,40 +30,48 @@ export class PendingWorkspaceInvitationsComponent implements OnInit {
   }
 
   accept(invitationId: number): void {
-    if (this.actionInvitationId() !== null) {
+    if (this.actionInvitationIds().has(invitationId)) {
       return;
     }
 
     this.errorMessage.set(null);
-    this.actionInvitationId.set(invitationId);
+    this.startAction(invitationId);
 
     this.invitationService.acceptInvitation(invitationId).subscribe({
       next: () => {
         this.removeInvitation(invitationId);
-        this.actionInvitationId.set(null);
+        this.finishAction(invitationId);
         this.invitationAccepted.emit();
       },
       error: (error: HttpErrorResponse) => {
-        this.handleActionError(error, 'Could not accept invitation.');
+        this.handleActionError(
+          invitationId,
+          error,
+          'Could not accept invitation.',
+        );
       },
     });
   }
 
   reject(invitationId: number): void {
-    if (this.actionInvitationId() !== null) {
+    if (this.actionInvitationIds().has(invitationId)) {
       return;
     }
 
     this.errorMessage.set(null);
-    this.actionInvitationId.set(invitationId);
+    this.startAction(invitationId);
 
     this.invitationService.rejectInvitation(invitationId).subscribe({
       next: () => {
         this.removeInvitation(invitationId);
-        this.actionInvitationId.set(null);
+        this.finishAction(invitationId);
       },
       error: (error: HttpErrorResponse) => {
-        this.handleActionError(error, 'Could not reject invitation.');
+        this.handleActionError(
+          invitationId,
+          error,
+          'Could not reject invitation.',
+        );
       },
     });
   }
@@ -92,12 +100,29 @@ export class PendingWorkspaceInvitationsComponent implements OnInit {
     );
   }
 
+  private startAction(invitationId: number): void {
+    this.actionInvitationIds.update((invitationIds) => {
+      const updatedIds = new Set(invitationIds);
+      updatedIds.add(invitationId);
+      return updatedIds;
+    });
+  }
+
+  private finishAction(invitationId: number): void {
+    this.actionInvitationIds.update((invitationIds) => {
+      const updatedIds = new Set(invitationIds);
+      updatedIds.delete(invitationId);
+      return updatedIds;
+    });
+  }
+
   private handleActionError(
+    invitationId: number,
     error: HttpErrorResponse,
     fallbackMessage: string,
   ): void {
     this.errorMessage.set(this.getErrorMessage(error, fallbackMessage));
-    this.actionInvitationId.set(null);
+    this.finishAction(invitationId);
   }
 
   private getErrorMessage(
