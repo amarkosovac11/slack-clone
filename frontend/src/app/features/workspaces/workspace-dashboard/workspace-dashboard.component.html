@@ -237,6 +237,18 @@
 
       @if (selectedChannel()!.privateChannel) {
       <div class="channel-header-actions">
+        @if (canManageSelectedChannelMembers()) {
+        <button
+          type="button"
+          class="channel-member-count"
+          title="View private channel members"
+          (click)="openChannelMembersModal()"
+        >
+          <span aria-hidden="true">&#128101;</span>
+          {{ channelMemberCount() ?? '...' }}
+        </button>
+        }
+
         <span class="private-badge">
           Private
         </span>
@@ -252,9 +264,10 @@
         }
       </div>
       } @else {
-      <span class="public-badge">
-        Public
-      </span>
+      <div class="channel-header-actions">
+        <span class="public-access-label">All workspace members</span>
+        <span class="public-badge">Public</span>
+      </div>
       }
 
     </header>

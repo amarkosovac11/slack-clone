@@ -91,6 +91,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly showChannelMembersModal = signal(false);
   readonly workspaceMembers = signal<WorkspaceMember[]>([]);
   readonly channelMembers = signal<ChannelMember[]>([]);
+  readonly channelMemberCount = signal<number | null>(null);
   readonly membersLoading = signal(false);
   readonly membersError = signal<string | null>(null);
   readonly memberActionUserId = signal<number | null>(null);
@@ -204,6 +205,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
       this.resetChannelMembersModal();
       this.selectedChannel.set(channel);
+      this.loadPrivateChannelMemberCount(workspaceId, channel);
       this.loadMessages(workspaceId, channel.id);
       return;
     }
@@ -454,6 +456,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       next: ({ workspaceMembers, channelMembers }) => {
         this.workspaceMembers.set(workspaceMembers);
         this.channelMembers.set(channelMembers);
+        this.channelMemberCount.set(channelMembers.length);
         this.membersLoading.set(false);
       },
       error: (error: HttpErrorResponse) => {
@@ -529,6 +532,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.channelService.getMembers(workspaceId, channelId).subscribe({
       next: (members) => {
         this.channelMembers.set(members);
+        this.channelMemberCount.set(members.length);
         this.memberActionUserId.set(null);
       },
       error: (error: HttpErrorResponse) => {
@@ -545,6 +549,36 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.membersError.set(apiError?.message ?? fallbackMessage);
     this.memberActionUserId.set(null);
+  }
+
+  private loadPrivateChannelMemberCount(
+    workspaceId: number,
+    channel: Channel,
+  ): void {
+    this.channelMemberCount.set(null);
+
+    if (!channel.privateChannel || !this.canManageSelectedChannelMembers()) {
+      return;
+    }
+
+    this.channelService.getMembers(workspaceId, channel.id).subscribe({
+      next: (members) => {
+        if (
+          this.selectedWorkspaceId() === workspaceId &&
+          this.selectedChannel()?.id === channel.id
+        ) {
+          this.channelMemberCount.set(members.length);
+        }
+      },
+      error: () => {
+        if (
+          this.selectedWorkspaceId() === workspaceId &&
+          this.selectedChannel()?.id === channel.id
+        ) {
+          this.channelMemberCount.set(null);
+        }
+      },
+    });
   }
 
   private resetChannelMembersModal(): void {
@@ -574,6 +608,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.selectedWorkspaceId.set(workspaceId);
     this.selectedChannel.set(null);
+    this.channelMemberCount.set(null);
 
     this.messages.set([]);
     this.messagesError.set(null);
@@ -610,6 +645,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         }
 
         this.selectedChannel.set(channel);
+        this.loadPrivateChannelMemberCount(workspaceId, channel);
         this.loadMessages(workspaceId, channel.id);
       },
 

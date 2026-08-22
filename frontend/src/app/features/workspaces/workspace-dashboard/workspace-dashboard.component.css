@@ -375,6 +375,32 @@ form button:disabled {
     cursor: pointer;
 }
 
+.channel-member-count {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 9px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    color: #4b5563;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.channel-member-count:hover {
+    border-color: #c4b5fd;
+    background: #faf5ff;
+    color: #611f69;
+}
+
+.public-access-label {
+    color: #6b7280;
+    font-size: 12px;
+}
+
 .manage-members-button:hover {
     background: #f3e8ff;
 }
