@@ -7,6 +7,9 @@ import com.amar.slackclone.channel.ChannelNotFoundException;
 import com.amar.slackclone.channel.UserNotFoundException;
 import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
 import com.amar.slackclone.channel.WorkspaceNotFoundException;
+import com.amar.slackclone.workspace.WorkspaceInvitationConflictException;
+import com.amar.slackclone.workspace.WorkspaceInvitationAccessDeniedException;
+import com.amar.slackclone.workspace.WorkspaceInvitationNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -153,6 +156,63 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
+                .body(error);
+    }
+
+    @ExceptionHandler(WorkspaceInvitationConflictException.class)
+    public ResponseEntity<ApiError> handleWorkspaceInvitationConflict(
+            WorkspaceInvitationConflictException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = new ApiError(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error);
+    }
+
+    @ExceptionHandler(WorkspaceInvitationNotFoundException.class)
+    public ResponseEntity<ApiError> handleWorkspaceInvitationNotFound(
+            WorkspaceInvitationNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = new ApiError(
+                Instant.now(),
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(error);
+    }
+
+    @ExceptionHandler(WorkspaceInvitationAccessDeniedException.class)
+    public ResponseEntity<ApiError> handleWorkspaceInvitationAccessDenied(
+            WorkspaceInvitationAccessDeniedException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = new ApiError(
+                Instant.now(),
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
                 .body(error);
     }
 
