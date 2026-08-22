@@ -16,6 +16,7 @@ import { MessageWebSocketService } from '../../messages/message-websocket.servic
 
 import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
 import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
+import { WorkspaceMembersComponent } from '../workspace-members/workspace-members.component';
 import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
 
@@ -27,6 +28,7 @@ import { WorkspaceService } from '../workspace.service';
     ReactiveFormsModule,
     PendingWorkspaceInvitationsComponent,
     WorkspaceInvitationManagementComponent,
+    WorkspaceMembersComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
   styleUrl: './workspace-dashboard.component.css',
@@ -39,6 +41,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly isLoading = signal(true);
   readonly isCreating = signal(false);
   readonly errorMessage = signal('');
+  readonly showCreateWorkspaceModal = signal(false);
+  readonly workspaceCreateError = signal<string | null>(null);
 
   readonly currentUser: AuthService['currentUser'];
 
@@ -87,6 +91,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly showChannelMembersModal = signal(false);
   readonly workspaceMembers = signal<WorkspaceMember[]>([]);
   readonly channelMembers = signal<ChannelMember[]>([]);
+  readonly channelMemberCount = signal<number | null>(null);
   readonly membersLoading = signal(false);
   readonly membersError = signal<string | null>(null);
   readonly memberActionUserId = signal<number | null>(null);
@@ -200,6 +205,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
       this.resetChannelMembersModal();
       this.selectedChannel.set(channel);
+      this.loadPrivateChannelMemberCount(workspaceId, channel);
       this.loadMessages(workspaceId, channel.id);
       return;
     }
@@ -240,6 +246,29 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/workspaces']).then(() => {
       this.loadWorkspaceChannels(workspaceId);
     });
+  }
+
+  onWorkspaceSelectionChange(event: Event): void {
+    const workspaceId = Number((event.target as HTMLSelectElement).value);
+
+    if (Number.isInteger(workspaceId) && workspaceId > 0) {
+      this.selectWorkspace(workspaceId);
+    }
+  }
+
+  openCreateWorkspaceModal(): void {
+    this.workspaceCreateError.set(null);
+    this.createForm.reset({ name: '' });
+    this.showCreateWorkspaceModal.set(true);
+  }
+
+  closeCreateWorkspaceModal(): void {
+    if (this.isCreating()) {
+      return;
+    }
+
+    this.showCreateWorkspaceModal.set(false);
+    this.workspaceCreateError.set(null);
   }
 
   selectChannel(channel: Channel): void {
@@ -427,6 +456,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       next: ({ workspaceMembers, channelMembers }) => {
         this.workspaceMembers.set(workspaceMembers);
         this.channelMembers.set(channelMembers);
+        this.channelMemberCount.set(channelMembers.length);
         this.membersLoading.set(false);
       },
       error: (error: HttpErrorResponse) => {
@@ -502,6 +532,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.channelService.getMembers(workspaceId, channelId).subscribe({
       next: (members) => {
         this.channelMembers.set(members);
+        this.channelMemberCount.set(members.length);
         this.memberActionUserId.set(null);
       },
       error: (error: HttpErrorResponse) => {
@@ -518,6 +549,36 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.membersError.set(apiError?.message ?? fallbackMessage);
     this.memberActionUserId.set(null);
+  }
+
+  private loadPrivateChannelMemberCount(
+    workspaceId: number,
+    channel: Channel,
+  ): void {
+    this.channelMemberCount.set(null);
+
+    if (!channel.privateChannel || !this.canManageSelectedChannelMembers()) {
+      return;
+    }
+
+    this.channelService.getMembers(workspaceId, channel.id).subscribe({
+      next: (members) => {
+        if (
+          this.selectedWorkspaceId() === workspaceId &&
+          this.selectedChannel()?.id === channel.id
+        ) {
+          this.channelMemberCount.set(members.length);
+        }
+      },
+      error: () => {
+        if (
+          this.selectedWorkspaceId() === workspaceId &&
+          this.selectedChannel()?.id === channel.id
+        ) {
+          this.channelMemberCount.set(null);
+        }
+      },
+    });
   }
 
   private resetChannelMembersModal(): void {
@@ -547,6 +608,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.selectedWorkspaceId.set(workspaceId);
     this.selectedChannel.set(null);
+    this.channelMemberCount.set(null);
 
     this.messages.set([]);
     this.messagesError.set(null);
@@ -583,6 +645,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         }
 
         this.selectedChannel.set(channel);
+        this.loadPrivateChannelMemberCount(workspaceId, channel);
         this.loadMessages(workspaceId, channel.id);
       },
 
@@ -677,7 +740,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   createWorkspace(): void {
-    this.errorMessage.set('');
+    this.workspaceCreateError.set(null);
 
     if (this.createForm.invalid) {
       this.createForm.markAllAsTouched();
@@ -697,11 +760,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
           this.createForm.reset();
           this.isCreating.set(false);
+          this.showCreateWorkspaceModal.set(false);
         },
         error: (error: HttpErrorResponse) => {
           const apiError = error.error as ApiErrorResponse | undefined;
 
-          this.errorMessage.set(
+          this.workspaceCreateError.set(
             apiError?.message ?? 'Could not create workspace.'
           );
 

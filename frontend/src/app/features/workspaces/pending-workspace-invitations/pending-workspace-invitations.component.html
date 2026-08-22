@@ -1,59 +1,82 @@
-<section class="pending-invitations" aria-labelledby="pending-invitations-title">
-  <div class="section-heading">
-    <div>
-      <h2 id="pending-invitations-title">Workspace invitations</h2>
-      <p>Join or decline workspaces you have been invited to.</p>
-    </div>
-    @if (!isLoading()) {
-      <span class="invitation-count">{{ invitations().length }}</span>
-    }
+<button type="button" class="invitations-trigger" (click)="open()">
+  <span>Invitations</span>
+  @if (!isLoading() && invitations().length > 0) {
+    <span class="invitation-count">{{ invitations().length }}</span>
+  }
+</button>
+
+@if (isOpen()) {
+  <div class="invitations-backdrop" role="presentation" (click)="close()">
+    <section
+      class="invitations-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pending-invitations-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="invitations-header">
+        <div>
+          <h2 id="pending-invitations-title">Workspace invitations</h2>
+          <p>Join or decline workspaces you have been invited to.</p>
+        </div>
+        <button
+          type="button"
+          class="close-button"
+          aria-label="Close pending invitations"
+          [disabled]="actionInvitationIds().size > 0"
+          (click)="close()"
+        >
+          &times;
+        </button>
+      </header>
+
+      <div class="invitations-content">
+        @if (errorMessage()) {
+          <p class="panel-state error-state">{{ errorMessage() }}</p>
+        }
+
+        @if (isLoading()) {
+          <div class="panel-state">Loading invitations...</div>
+        } @else if (invitations().length === 0) {
+          <div class="panel-state">You have no pending workspace invitations.</div>
+        } @else {
+          <div class="invitation-list">
+            @for (invitation of invitations(); track invitation.id) {
+              <article class="invitation-card">
+                <div class="workspace-icon">
+                  {{ invitation.workspaceName.charAt(0).toUpperCase() }}
+                </div>
+                <div class="invitation-details">
+                  <div class="invitation-title-row">
+                    <h3>{{ invitation.workspaceName }}</h3>
+                    <span>{{ invitation.role }}</span>
+                  </div>
+                  <p>Invited by {{ invitation.invitedByDisplayName }}</p>
+                  <small>Expires {{ invitation.expiresAt | date: 'mediumDate' }}</small>
+                </div>
+                <div class="invitation-actions">
+                  <button
+                    type="button"
+                    class="reject-button"
+                    [disabled]="actionInvitationIds().has(invitation.id)"
+                    (click)="reject(invitation.id)"
+                  >
+                    {{ actionInvitationIds().has(invitation.id) ? 'Working...' : 'Reject' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="accept-button"
+                    [disabled]="actionInvitationIds().has(invitation.id)"
+                    (click)="accept(invitation.id)"
+                  >
+                    {{ actionInvitationIds().has(invitation.id) ? 'Working...' : 'Accept' }}
+                  </button>
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </div>
+    </section>
   </div>
-
-  @if (errorMessage()) {
-    <p class="panel-state error-state">{{ errorMessage() }}</p>
-  }
-
-  @if (isLoading()) {
-    <div class="panel-state">Loading invitations...</div>
-  } @else if (invitations().length === 0) {
-    <div class="panel-state">You have no pending workspace invitations.</div>
-  } @else {
-    <div class="invitation-grid">
-      @for (invitation of invitations(); track invitation.id) {
-        <article class="invitation-card">
-          <div class="workspace-icon">
-            {{ invitation.workspaceName.charAt(0).toUpperCase() }}
-          </div>
-
-          <div class="invitation-details">
-            <div class="invitation-title-row">
-              <h3>{{ invitation.workspaceName }}</h3>
-              <span>{{ invitation.role }}</span>
-            </div>
-            <p>Invited by {{ invitation.invitedByDisplayName }}</p>
-            <small>Expires {{ invitation.expiresAt | date: 'mediumDate' }}</small>
-          </div>
-
-          <div class="invitation-actions">
-            <button
-              type="button"
-              class="reject-button"
-              [disabled]="actionInvitationIds().has(invitation.id)"
-              (click)="reject(invitation.id)"
-            >
-              {{ actionInvitationIds().has(invitation.id) ? 'Working...' : 'Reject' }}
-            </button>
-            <button
-              type="button"
-              class="accept-button"
-              [disabled]="actionInvitationIds().has(invitation.id)"
-              (click)="accept(invitation.id)"
-            >
-              {{ actionInvitationIds().has(invitation.id) ? 'Working...' : 'Accept' }}
-            </button>
-          </div>
-        </article>
-      }
-    </div>
-  }
-</section>
+}
