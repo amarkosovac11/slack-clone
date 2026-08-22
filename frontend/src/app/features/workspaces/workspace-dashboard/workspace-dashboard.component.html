@@ -1,100 +1,120 @@
-@if (errorMessage()) {
-<div class="error-message">
-  {{ errorMessage() }}
-</div>
-}
-
-<section class="create-card">
-  <div class="create-card-header">
-    <div>
-      <h2>Create workspace</h2>
-      <p>Create a new place for your team to collaborate.</p>
-    </div>
+<section class="workspace-toolbar" aria-label="Workspace navigation">
+  <div class="workspace-switcher">
+    <label for="workspace-switcher">Workspace</label>
+    @if (isLoading()) {
+      <span class="workspace-loading">Loading workspaces...</span>
+    } @else if (workspaces().length > 0) {
+      <select
+        id="workspace-switcher"
+        [value]="selectedWorkspaceId() ?? ''"
+        (change)="onWorkspaceSelectionChange($event)"
+      >
+        <option value="" disabled>Select a workspace</option>
+        @for (workspace of workspaces(); track workspace.id) {
+          <option [value]="workspace.id">
+            {{ workspace.name }} | {{ workspace.currentUserRole }}
+          </option>
+        }
+      </select>
+    } @else {
+      <span class="workspace-loading">No workspace selected</span>
+    }
   </div>
 
-  <form [formGroup]="createForm" (ngSubmit)="createWorkspace()">
-    <input type="text" formControlName="name" placeholder="Workspace name" />
-
-    <button type="submit" [disabled]="isCreating()">
-      {{ isCreating() ? 'Creating...' : 'Create' }}
+  <div class="workspace-toolbar-actions">
+    <app-pending-workspace-invitations
+      (invitationAccepted)="loadWorkspaces()"
+    />
+    <button
+      type="button"
+      class="create-workspace-button"
+      (click)="openCreateWorkspaceModal()"
+    >
+      + Create workspace
     </button>
-  </form>
-
-  @if (
-  createForm.controls.name.touched &&
-  createForm.controls.name.invalid
-  ) {
-  <small class="field-error">
-    Workspace name must have between 2 and 100 characters.
-  </small>
-  }
+  </div>
 </section>
 
-<app-pending-workspace-invitations
-  (invitationAccepted)="loadWorkspaces()"
-/>
+@if (errorMessage()) {
+  <div class="error-message">{{ errorMessage() }}</div>
+}
 
-@if (isLoading()) {
+@if (showCreateWorkspaceModal()) {
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    (click)="closeCreateWorkspaceModal()"
+  >
+    <section
+      class="create-channel-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-workspace-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="modal-header">
+        <div>
+          <h2 id="create-workspace-title">Create workspace</h2>
+          <p>Create a new place for your team to collaborate.</p>
+        </div>
+        <button
+          type="button"
+          class="modal-close-button"
+          aria-label="Close create workspace"
+          [disabled]="isCreating()"
+          (click)="closeCreateWorkspaceModal()"
+        >
+          &times;
+        </button>
+      </header>
 
-<div class="empty-state">
-  Loading workspaces...
-</div>
-
-} @else if (workspaces().length === 0) {
-
-<div class="empty-state">
-  You do not belong to any workspace yet.
-</div>
-
-} @else {
-
-<section class="workspace-section">
-
-  <div class="section-heading">
-    <div>
-      <h2>Your workspaces</h2>
-      <p>Select a workspace to view its channels.</p>
-    </div>
-  </div>
-
-  <div class="workspace-grid">
-
-    @for (workspace of workspaces(); track workspace.id) {
-
-    <button type="button" class="workspace-card" [class.selected]="isWorkspaceSelected(workspace.id)"
-      (click)="selectWorkspace(workspace.id)">
-
-      <div class="workspace-icon">
-        {{ workspace.name.charAt(0).toUpperCase() }}
-      </div>
-
-      <div class="workspace-info">
-
-        <div class="workspace-name-row">
-          <h3>{{ workspace.name }}</h3>
-
-          @if (isWorkspaceSelected(workspace.id)) {
-          <span class="selected-label">
-            Selected
-          </span>
+      <form
+        class="create-channel-form"
+        [formGroup]="createForm"
+        (ngSubmit)="createWorkspace()"
+      >
+        <div class="form-field">
+          <label for="workspace-name">Workspace name</label>
+          <input
+            id="workspace-name"
+            type="text"
+            formControlName="name"
+            placeholder="Workspace name"
+          />
+          @if (
+            createForm.controls.name.touched &&
+            createForm.controls.name.invalid
+          ) {
+            <small class="field-error">
+              Workspace name must have between 2 and 100 characters.
+            </small>
           }
         </div>
 
-        <p>{{ workspace.slug }}</p>
+        @if (workspaceCreateError()) {
+          <div class="modal-error">{{ workspaceCreateError() }}</div>
+        }
 
-        <span class="role">
-          {{ workspace.currentUserRole }}
-        </span>
-
-      </div>
-
-    </button>
-
-    }
-
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="secondary-button"
+            [disabled]="isCreating()"
+            (click)="closeCreateWorkspaceModal()"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="primary-button"
+            [disabled]="isCreating()"
+          >
+            {{ isCreating() ? 'Creating...' : 'Create workspace' }}
+          </button>
+        </div>
+      </form>
+    </section>
   </div>
-
-</section>
 }
 
 @if (selectedWorkspaceId()) {
@@ -119,14 +139,21 @@
 
     <div class="channel-divider"></div>
 
+    <div class="workspace-actions">
+      <app-workspace-members
+        [workspaceId]="selectedWorkspace()!.id"
+        [workspaceName]="selectedWorkspace()!.name"
+      />
+
     @if (canManageSelectedWorkspaceInvitations()) {
-    <app-workspace-invitation-management
-      [workspaceId]="selectedWorkspace()!.id"
-      [workspaceName]="selectedWorkspace()!.name"
-    />
+      <app-workspace-invitation-management
+        [workspaceId]="selectedWorkspace()!.id"
+        [workspaceName]="selectedWorkspace()!.name"
+      />
+    }
+    </div>
 
     <div class="channel-divider"></div>
-    }
 
     @if (channelsLoading()) {
 

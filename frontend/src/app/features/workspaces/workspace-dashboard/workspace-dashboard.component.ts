@@ -16,6 +16,7 @@ import { MessageWebSocketService } from '../../messages/message-websocket.servic
 
 import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
 import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
+import { WorkspaceMembersComponent } from '../workspace-members/workspace-members.component';
 import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
 
@@ -27,6 +28,7 @@ import { WorkspaceService } from '../workspace.service';
     ReactiveFormsModule,
     PendingWorkspaceInvitationsComponent,
     WorkspaceInvitationManagementComponent,
+    WorkspaceMembersComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
   styleUrl: './workspace-dashboard.component.css',
@@ -39,6 +41,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly isLoading = signal(true);
   readonly isCreating = signal(false);
   readonly errorMessage = signal('');
+  readonly showCreateWorkspaceModal = signal(false);
+  readonly workspaceCreateError = signal<string | null>(null);
 
   readonly currentUser: AuthService['currentUser'];
 
@@ -240,6 +244,29 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/workspaces']).then(() => {
       this.loadWorkspaceChannels(workspaceId);
     });
+  }
+
+  onWorkspaceSelectionChange(event: Event): void {
+    const workspaceId = Number((event.target as HTMLSelectElement).value);
+
+    if (Number.isInteger(workspaceId) && workspaceId > 0) {
+      this.selectWorkspace(workspaceId);
+    }
+  }
+
+  openCreateWorkspaceModal(): void {
+    this.workspaceCreateError.set(null);
+    this.createForm.reset({ name: '' });
+    this.showCreateWorkspaceModal.set(true);
+  }
+
+  closeCreateWorkspaceModal(): void {
+    if (this.isCreating()) {
+      return;
+    }
+
+    this.showCreateWorkspaceModal.set(false);
+    this.workspaceCreateError.set(null);
   }
 
   selectChannel(channel: Channel): void {
@@ -677,7 +704,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   createWorkspace(): void {
-    this.errorMessage.set('');
+    this.workspaceCreateError.set(null);
 
     if (this.createForm.invalid) {
       this.createForm.markAllAsTouched();
@@ -697,11 +724,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
           this.createForm.reset();
           this.isCreating.set(false);
+          this.showCreateWorkspaceModal.set(false);
         },
         error: (error: HttpErrorResponse) => {
           const apiError = error.error as ApiErrorResponse | undefined;
 
-          this.errorMessage.set(
+          this.workspaceCreateError.set(
             apiError?.message ?? 'Could not create workspace.'
           );
 
