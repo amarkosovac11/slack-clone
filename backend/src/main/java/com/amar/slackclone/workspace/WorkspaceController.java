@@ -59,6 +59,17 @@ public class WorkspaceController {
         );
     }
 
+    @GetMapping("/{workspaceId}/invitations")
+    public List<WorkspaceInvitationResponse> getWorkspaceInvitations(
+            @PathVariable Long workspaceId,
+            Authentication authentication
+    ) {
+        return workspaceInvitationService.getWorkspaceInvitations(
+                workspaceId,
+                authentication.getName()
+        );
+    }
+
     @GetMapping
     public List<WorkspaceResponse> getCurrentUserWorkspaces(
             Authentication authentication

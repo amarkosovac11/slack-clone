@@ -15,8 +15,15 @@ public interface WorkspaceInvitationRepository
             WorkspaceInvitationStatus status
     );
 
+    Optional<WorkspaceInvitation> findByWorkspaceIdAndInvitedUserIdAndStatus(
+            Long workspaceId,
+            Long invitedUserId,
+            WorkspaceInvitationStatus status
+    );
+
     @EntityGraph(attributePaths = {
             "workspace",
+            "invitedUser",
             "invitedBy"
     })
     List<WorkspaceInvitation> findAllByInvitedUserIdAndStatusOrderByCreatedAtDesc(
@@ -42,4 +49,12 @@ public interface WorkspaceInvitationRepository
             Long id,
             Long invitedUserId
     );
+
+    @Override
+    @EntityGraph(attributePaths = {
+            "workspace",
+            "invitedUser",
+            "invitedBy"
+    })
+    Optional<WorkspaceInvitation> findById(Long id);
 }
