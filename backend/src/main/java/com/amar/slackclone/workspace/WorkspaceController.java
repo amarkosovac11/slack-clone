@@ -1,6 +1,8 @@
 package com.amar.slackclone.workspace;
 
 import com.amar.slackclone.workspace.dto.CreateWorkspaceRequest;
+import com.amar.slackclone.workspace.dto.CreateWorkspaceInvitationRequest;
+import com.amar.slackclone.workspace.dto.WorkspaceInvitationResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
 import jakarta.validation.Valid;
@@ -21,11 +23,14 @@ import java.util.List;
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;
+    private final WorkspaceInvitationService workspaceInvitationService;
 
     public WorkspaceController(
-            WorkspaceService workspaceService
+            WorkspaceService workspaceService,
+            WorkspaceInvitationService workspaceInvitationService
     ) {
         this.workspaceService = workspaceService;
+        this.workspaceInvitationService = workspaceInvitationService;
     }
 
     @PostMapping
@@ -35,6 +40,20 @@ public class WorkspaceController {
             Authentication authentication
     ) {
         return workspaceService.createWorkspace(
+                request,
+                authentication.getName()
+        );
+    }
+
+    @PostMapping("/{workspaceId}/invitations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public WorkspaceInvitationResponse createInvitation(
+            @PathVariable Long workspaceId,
+            @Valid @RequestBody CreateWorkspaceInvitationRequest request,
+            Authentication authentication
+    ) {
+        return workspaceInvitationService.createInvitation(
+                workspaceId,
                 request,
                 authentication.getName()
         );

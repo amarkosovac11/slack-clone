@@ -7,6 +7,7 @@ import com.amar.slackclone.channel.ChannelNotFoundException;
 import com.amar.slackclone.channel.UserNotFoundException;
 import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
 import com.amar.slackclone.channel.WorkspaceNotFoundException;
+import com.amar.slackclone.workspace.WorkspaceInvitationConflictException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -140,6 +141,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ChannelMembershipConflictException.class)
     public ResponseEntity<ApiError> handleChannelMembershipConflict(
             ChannelMembershipConflictException exception,
+            HttpServletRequest request
+    ) {
+        ApiError error = new ApiError(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error);
+    }
+
+    @ExceptionHandler(WorkspaceInvitationConflictException.class)
+    public ResponseEntity<ApiError> handleWorkspaceInvitationConflict(
+            WorkspaceInvitationConflictException exception,
             HttpServletRequest request
     ) {
         ApiError error = new ApiError(
