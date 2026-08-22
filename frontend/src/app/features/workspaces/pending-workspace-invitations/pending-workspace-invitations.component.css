@@ -1,0 +1,160 @@
+.pending-invitations {
+  margin-top: 34px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-heading h2,
+.section-heading p {
+  margin: 0;
+}
+
+.section-heading h2 {
+  color: #1f2937;
+}
+
+.section-heading p {
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.invitation-count {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: #f3e8ff;
+  color: #6b21a8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.panel-state {
+  padding: 20px;
+  border: 1px dashed #c4b5fd;
+  border-radius: 12px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.error-state {
+  border: 0;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.invitation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.invitation-card {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px 14px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 8px 24px rgb(17 24 39 / 5%);
+}
+
+.workspace-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 10px;
+  background: #611f69;
+  color: white;
+  font-weight: 800;
+}
+
+.invitation-details {
+  min-width: 0;
+}
+
+.invitation-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invitation-title-row h3 {
+  overflow: hidden;
+  margin: 0;
+  color: #1f2937;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invitation-title-row span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.invitation-details p,
+.invitation-details small {
+  color: #6b7280;
+}
+
+.invitation-details p {
+  margin: 5px 0 3px;
+  font-size: 13px;
+}
+
+.invitation-details small {
+  font-size: 11px;
+}
+
+.invitation-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.invitation-actions button {
+  padding: 8px 13px;
+  border-radius: 7px;
+  background: white;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.accept-button {
+  border: 1px solid #007a5a;
+  background: #007a5a !important;
+  color: white;
+}
+
+.reject-button {
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+}
+
+.invitation-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 500px) {
+  .invitation-grid {
+    grid-template-columns: 1fr;
+  }
+}

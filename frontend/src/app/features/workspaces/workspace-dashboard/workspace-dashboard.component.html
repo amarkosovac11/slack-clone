@@ -30,6 +30,10 @@
   }
 </section>
 
+<app-pending-workspace-invitations
+  (invitationAccepted)="loadWorkspaces()"
+/>
+
 @if (isLoading()) {
 
 <div class="empty-state">
@@ -114,6 +118,15 @@
     </div>
 
     <div class="channel-divider"></div>
+
+    @if (canManageSelectedWorkspaceInvitations()) {
+    <app-workspace-invitation-management
+      [workspaceId]="selectedWorkspace()!.id"
+      [workspaceName]="selectedWorkspace()!.name"
+    />
+
+    <div class="channel-divider"></div>
+    }
 
     @if (channelsLoading()) {
 
