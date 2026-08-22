@@ -1,0 +1,66 @@
+<button type="button" class="workspace-action" (click)="open()">
+  <span class="action-icon" aria-hidden="true">&#128101;</span>
+  <span>People</span>
+</button>
+
+@if (isOpen()) {
+  <div class="members-backdrop" role="presentation" (click)="close()">
+    <section
+      class="members-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="workspace-members-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="members-header">
+        <div>
+          <h2 id="workspace-members-title">Workspace members</h2>
+          <p>{{ workspaceName() }}</p>
+        </div>
+        <button
+          type="button"
+          class="close-button"
+          aria-label="Close workspace members"
+          (click)="close()"
+        >
+          &times;
+        </button>
+      </header>
+
+      <div class="members-content">
+        @if (isLoading()) {
+          <div class="members-state">Loading workspace members...</div>
+        } @else if (errorMessage()) {
+          <div class="members-state error-state">{{ errorMessage() }}</div>
+        } @else if (members().length === 0) {
+          <div class="members-state">No workspace members found.</div>
+        } @else {
+          <div class="member-count">
+            {{ members().length }} {{ members().length === 1 ? 'person' : 'people' }}
+          </div>
+
+          <div class="member-list">
+            @for (member of members(); track member.userId) {
+              <article class="member-row">
+                <div class="member-avatar" aria-hidden="true">
+                  {{ member.displayName.charAt(0).toUpperCase() }}
+                </div>
+                <div class="member-info">
+                  <strong>{{ member.displayName }}</strong>
+                  <span>{{ member.email }}</span>
+                  <small>Joined {{ member.joinedAt | date: 'mediumDate' }}</small>
+                </div>
+                <span
+                  class="role-badge"
+                  [class]="'role-badge role-' + member.role.toLowerCase()"
+                >
+                  {{ member.role }}
+                </span>
+              </article>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+}
