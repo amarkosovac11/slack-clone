@@ -14,13 +14,20 @@ import { Message } from '../../messages/message.models';
 import { MessageService } from '../../messages/message.service';
 import { MessageWebSocketService } from '../../messages/message-websocket.service';
 
+import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
+import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
 import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
 
 @Component({
   selector: 'app-workspace-dashboard',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    PendingWorkspaceInvitationsComponent,
+    WorkspaceInvitationManagementComponent,
+  ],
   templateUrl: './workspace-dashboard.component.html',
   styleUrl: './workspace-dashboard.component.css',
 })
@@ -49,6 +56,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly selectedWorkspaceRole = computed(
     () => this.selectedWorkspace()?.currentUserRole ?? null
   );
+
+  readonly canManageSelectedWorkspaceInvitations = computed(() => {
+    const role = this.selectedWorkspaceRole();
+    return role === 'OWNER' || role === 'ADMIN';
+  });
 
   readonly canManageSelectedChannelMembers = computed(() => {
     const channel = this.selectedChannel();
