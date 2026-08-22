@@ -16,6 +16,7 @@ import { WorkspaceInvitationService } from '../workspace-invitation.service';
 export class PendingWorkspaceInvitationsComponent implements OnInit {
   readonly invitationAccepted = output<void>();
 
+  readonly isOpen = signal(false);
   readonly invitations = signal<WorkspaceInvitation[]>([]);
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
@@ -27,6 +28,18 @@ export class PendingWorkspaceInvitationsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadInvitations();
+  }
+
+  open(): void {
+    this.isOpen.set(true);
+  }
+
+  close(): void {
+    if (this.actionInvitationIds().size > 0) {
+      return;
+    }
+
+    this.isOpen.set(false);
   }
 
   accept(invitationId: number): void {
