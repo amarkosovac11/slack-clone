@@ -3,6 +3,7 @@ package com.amar.slackclone.channel;
 import com.amar.slackclone.channel.dto.ChannelResponse;
 import com.amar.slackclone.channel.dto.ChannelMemberResponse;
 import com.amar.slackclone.channel.dto.CreateChannelRequest;
+import com.amar.slackclone.channel.dto.UpdateChannelRequest;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.Workspace;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
+import java.time.OffsetDateTime;
 
 @Service
 public class ChannelService {
@@ -126,6 +128,62 @@ public class ChannelService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public ChannelResponse updateChannel(Long workspaceId, Long channelId,
+            UpdateChannelRequest request, String email) {
+        requireManager(workspaceId, email);
+        Channel channel = requireChannel(workspaceId, channelId);
+        requireActive(channel);
+        String name = request.name().trim();
+        if (!name.equals(channel.getName())) {
+            String slug = slugify(name);
+            if (channelRepository.existsByWorkspaceIdAndSlugAndIdNot(workspaceId, slug, channelId)) {
+                throw new ChannelConflictException("A channel with this name already exists in the workspace");
+            }
+            channel.setName(name);
+            channel.setSlug(slug);
+        }
+        channel.setDescription(normalizeDescription(request.description()));
+        return toResponse(channel);
+    }
+
+    @Transactional
+    public ChannelResponse archiveChannel(Long workspaceId, Long channelId, String email) {
+        requireManager(workspaceId, email);
+        Channel channel = requireChannel(workspaceId, channelId);
+        requireActive(channel);
+        channel.setArchivedAt(OffsetDateTime.now());
+        return toResponse(channel);
+    }
+
+    @Transactional
+    public void deleteChannel(Long workspaceId, Long channelId, String email) {
+        requireManager(workspaceId, email);
+        channelRepository.delete(requireChannel(workspaceId, channelId));
+    }
+
+    private WorkspaceMember requireManager(Long workspaceId, String email) {
+        User user = getCurrentUser(email);
+        workspaceRepository.findById(workspaceId)
+                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
+        WorkspaceMember membership = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(workspaceId, user.getId())
+                .orElseThrow(() -> new WorkspaceAccessDeniedException("You are not a member of this workspace"));
+        if (membership.getRole() != WorkspaceRole.OWNER && membership.getRole() != WorkspaceRole.ADMIN) {
+            throw new WorkspaceAccessDeniedException("Only workspace owners and admins can manage channels");
+        }
+        return membership;
+    }
+
+    private Channel requireChannel(Long workspaceId, Long channelId) {
+        return channelRepository.findByIdAndWorkspaceId(channelId, workspaceId)
+                .orElseThrow(() -> new ChannelNotFoundException(channelId));
+    }
+
+    private void requireActive(Channel channel) {
+        if (channel.isArchived()) throw new ChannelConflictException("Channel is archived");
     }
 
     @Transactional

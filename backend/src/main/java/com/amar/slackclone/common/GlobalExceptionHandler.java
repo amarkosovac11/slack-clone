@@ -4,6 +4,7 @@ import com.amar.slackclone.auth.InvalidCredentialsException;
 import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
 import com.amar.slackclone.channel.ChannelMembershipConflictException;
 import com.amar.slackclone.channel.ChannelNotFoundException;
+import com.amar.slackclone.channel.ChannelConflictException;
 import com.amar.slackclone.channel.UserNotFoundException;
 import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
 import com.amar.slackclone.channel.WorkspaceNotFoundException;
@@ -28,6 +29,14 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ChannelConflictException.class)
+    public ResponseEntity<ApiError> handleChannelConflict(ChannelConflictException exception,
+            HttpServletRequest request) {
+        ApiError error = new ApiError(Instant.now(), HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(), exception.getMessage(), request.getRequestURI(), null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiError> handleInvalidCredentials(

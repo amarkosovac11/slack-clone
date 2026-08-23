@@ -3,6 +3,7 @@ package com.amar.slackclone.channel;
 import com.amar.slackclone.channel.dto.ChannelResponse;
 import com.amar.slackclone.channel.dto.ChannelMemberResponse;
 import com.amar.slackclone.channel.dto.CreateChannelRequest;
+import com.amar.slackclone.channel.dto.UpdateChannelRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -96,5 +97,24 @@ public class ChannelController {
                                 currentUserEmail);
 
                 return ResponseEntity.noContent().build();
+        }
+
+        @PatchMapping("/{channelId}")
+        public ChannelResponse updateChannel(@PathVariable Long workspaceId, @PathVariable Long channelId,
+                        @Valid @RequestBody UpdateChannelRequest request, Authentication authentication) {
+                return channelService.updateChannel(workspaceId, channelId, request, authentication.getName());
+        }
+
+        @PostMapping("/{channelId}/archive")
+        public ChannelResponse archiveChannel(@PathVariable Long workspaceId, @PathVariable Long channelId,
+                        Authentication authentication) {
+                return channelService.archiveChannel(workspaceId, channelId, authentication.getName());
+        }
+
+        @DeleteMapping("/{channelId}")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        public void deleteChannel(@PathVariable Long workspaceId, @PathVariable Long channelId,
+                        Authentication authentication) {
+                channelService.deleteChannel(workspaceId, channelId, authentication.getName());
         }
 }
