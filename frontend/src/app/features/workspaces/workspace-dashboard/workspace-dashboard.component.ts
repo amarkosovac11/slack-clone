@@ -89,6 +89,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly editingMessageId = signal<number | null>(null);
   readonly messageMutationLoading = signal(false);
   readonly messageMutationError = signal<string | null>(null);
+  readonly messagePendingDelete = signal<Message | null>(null);
   readonly webSocketConnected: MessageWebSocketService['connected'];
 
   readonly showCreateChannelModal = signal(false);
@@ -915,5 +916,34 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   isEdited(message: Message): boolean {
     return !message.deletedAt && Date.parse(message.updatedAt) > Date.parse(message.createdAt) + 1000;
+  }
+
+  requestMessageDelete(message: Message): void {
+    if (message.senderId === this.currentUser()?.id && !message.deletedAt) {
+      this.messagePendingDelete.set(message); this.messageMutationError.set(null);
+    }
+  }
+
+  cancelMessageDelete(): void {
+    if (!this.messageMutationLoading()) this.messagePendingDelete.set(null);
+  }
+
+  confirmMessageDelete(): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+    const message = this.messagePendingDelete();
+    if (workspaceId === null || !channel || !message) return;
+    this.messageMutationLoading.set(true); this.messageMutationError.set(null);
+    this.messageService.deleteMessage(workspaceId, channel.id, message.id).subscribe({
+      next: deleted => {
+        this.upsertMessage(deleted); this.messagePendingDelete.set(null);
+        this.messageMutationLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as ApiErrorResponse | undefined;
+        this.messageMutationError.set(apiError?.message ?? 'Could not delete message.');
+        this.messageMutationLoading.set(false);
+      },
+    });
   }
 }

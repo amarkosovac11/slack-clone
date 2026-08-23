@@ -341,7 +341,10 @@
             }
           </div>
           @if (!message.deletedAt && message.senderId === currentUser()?.id && editingMessageId() !== message.id) {
-            <div class="message-actions"><button type="button" (click)="startEditingMessage(message)">Edit</button></div>
+            <div class="message-actions">
+              <button type="button" (click)="startEditingMessage(message)">Edit</button>
+              <button type="button" class="message-delete-button" (click)="requestMessageDelete(message)">Delete</button>
+            </div>
           }
         </article>
         }
@@ -711,6 +714,22 @@
           </div>
         }
       </section>
+    </section>
+  </div>
+}
+@if (messagePendingDelete(); as message) {
+  <div class="modal-backdrop" role="presentation" (click)="cancelMessageDelete()">
+    <section class="message-delete-dialog" role="alertdialog" aria-modal="true"
+      aria-labelledby="delete-message-title" (click)="$event.stopPropagation()">
+      <h2 id="delete-message-title">Delete this message?</h2>
+      <p>This message will be replaced with “This message was deleted”.</p>
+      @if (messageMutationError()) { <div class="modal-error">{{ messageMutationError() }}</div> }
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" [disabled]="messageMutationLoading()" (click)="cancelMessageDelete()">Cancel</button>
+        <button type="button" class="delete-channel-button" [disabled]="messageMutationLoading()" (click)="confirmMessageDelete()">
+          {{ messageMutationLoading() ? 'Deleting...' : 'Delete message' }}
+        </button>
+      </div>
     </section>
   </div>
 }
