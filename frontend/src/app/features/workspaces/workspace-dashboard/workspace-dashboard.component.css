@@ -972,8 +972,11 @@ form button:disabled {
 
 @media (max-width: 800px) {
     .workspace-view {
-        grid-template-columns: 220px minmax(0, 1fr);
+        grid-template-columns: 58px 220px minmax(0, 1fr);
     }
+
+    .workspace-rail { padding-inline: 6px; }
+    .workspace-rail-button { width: 40px; height: 40px; flex-basis: 40px; }
 }
 
 @media (max-width: 650px) {
@@ -986,40 +989,22 @@ form button:disabled {
         padding: 30px 0;
     }
 
-    .workspace-toolbar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .workspace-switcher select {
-        width: 100%;
-        min-width: 0;
-    }
-
-    .workspace-toolbar-actions {
-        justify-content: space-between;
-    }
-
     form {
         flex-direction: column;
     }
 
     .workspace-view {
-        display: block;
+        grid-template-columns: 52px 180px minmax(360px, 1fr);
+        overflow-x: auto;
     }
 
-.channel-sidebar {
-    overflow-y: auto;
+    .channel-sidebar {
+        overflow-y: auto;
         border-radius: 0;
     }
 
     .channel-content {
         min-height: 450px;
-    }
-
-    .channel-list {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .channel-header {
@@ -1038,6 +1023,9 @@ form button:disabled {
     .member-row {
         align-items: flex-start;
     }
+
+    .message-row { padding-inline: 14px; }
+    .message-actions { opacity: 1; }
 
 }
 .channel-settings-modal { max-height: calc(100vh - 48px); overflow-y: auto; }
