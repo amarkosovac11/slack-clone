@@ -10,6 +10,9 @@ import com.amar.slackclone.channel.WorkspaceNotFoundException;
 import com.amar.slackclone.workspace.WorkspaceInvitationConflictException;
 import com.amar.slackclone.workspace.WorkspaceInvitationAccessDeniedException;
 import com.amar.slackclone.workspace.WorkspaceInvitationNotFoundException;
+import com.amar.slackclone.workspace.WorkspaceMemberAccessDeniedException;
+import com.amar.slackclone.workspace.WorkspaceMemberConflictException;
+import com.amar.slackclone.workspace.WorkspaceMemberNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -214,6 +217,46 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(error);
+    }
+
+    @ExceptionHandler(WorkspaceMemberNotFoundException.class)
+    public ResponseEntity<ApiError> handleWorkspaceMemberNotFound(
+            WorkspaceMemberNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return apiError(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(WorkspaceMemberAccessDeniedException.class)
+    public ResponseEntity<ApiError> handleWorkspaceMemberAccessDenied(
+            WorkspaceMemberAccessDeniedException exception,
+            HttpServletRequest request
+    ) {
+        return apiError(HttpStatus.FORBIDDEN, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(WorkspaceMemberConflictException.class)
+    public ResponseEntity<ApiError> handleWorkspaceMemberConflict(
+            WorkspaceMemberConflictException exception,
+            HttpServletRequest request
+    ) {
+        return apiError(HttpStatus.CONFLICT, exception.getMessage(), request);
+    }
+
+    private ResponseEntity<ApiError> apiError(
+            HttpStatus status,
+            String message,
+            HttpServletRequest request
+    ) {
+        ApiError error = new ApiError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                message,
+                request.getRequestURI(),
+                null
+        );
+        return ResponseEntity.status(status).body(error);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

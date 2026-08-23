@@ -2,6 +2,7 @@ package com.amar.slackclone.workspace;
 
 import com.amar.slackclone.auth.InvalidCredentialsException;
 import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
+import com.amar.slackclone.channel.ChannelMemberRepository;
 import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
 import com.amar.slackclone.channel.WorkspaceNotFoundException;
 import com.amar.slackclone.user.User;
@@ -9,6 +10,7 @@ import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.dto.CreateWorkspaceRequest;
 import com.amar.slackclone.workspace.dto.WorkspaceResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
+import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +26,18 @@ public class WorkspaceService {
 private final WorkspaceRepository workspaceRepository;
 private final WorkspaceMemberRepository workspaceMemberRepository;
 private final UserRepository userRepository;
+private final ChannelMemberRepository channelMemberRepository;
 
 public WorkspaceService(
         WorkspaceRepository workspaceRepository,
         WorkspaceMemberRepository workspaceMemberRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        ChannelMemberRepository channelMemberRepository
 ) {
     this.workspaceRepository = workspaceRepository;
     this.workspaceMemberRepository = workspaceMemberRepository;
     this.userRepository = userRepository;
+    this.channelMemberRepository = channelMemberRepository;
 }
 
 @Transactional
@@ -110,6 +115,104 @@ public List<WorkspaceMemberResponse> getWorkspaceMembers(
             .stream()
             .map(this::toWorkspaceMemberResponse)
             .toList();
+}
+
+@Transactional
+public WorkspaceMemberResponse updateWorkspaceMemberRole(
+        Long workspaceId,
+        Long targetUserId,
+        UpdateWorkspaceMemberRoleRequest request,
+        String authenticatedEmail
+) {
+    WorkspaceMember actor = getActorMembership(workspaceId, authenticatedEmail);
+
+    if (actor.getRole() != WorkspaceRole.OWNER) {
+        throw new WorkspaceMemberAccessDeniedException(
+                "Only the workspace owner can change member roles"
+        );
+    }
+
+    WorkspaceMember target = getTargetMembership(workspaceId, targetUserId);
+
+    if (target.getRole() == WorkspaceRole.OWNER) {
+        throw new WorkspaceMemberConflictException(
+                "The workspace owner role cannot be changed"
+        );
+    }
+
+    if (request.role() == WorkspaceRole.OWNER) {
+        throw new WorkspaceMemberConflictException(
+                "OWNER cannot be assigned through member management"
+        );
+    }
+
+    target.setRole(request.role());
+    return toWorkspaceMemberResponse(target);
+}
+
+@Transactional
+public void removeWorkspaceMember(
+        Long workspaceId,
+        Long targetUserId,
+        String authenticatedEmail
+) {
+    WorkspaceMember actor = getActorMembership(workspaceId, authenticatedEmail);
+    WorkspaceMember target = getTargetMembership(workspaceId, targetUserId);
+
+    if (actor.getUser().getId().equals(targetUserId)) {
+        throw new WorkspaceMemberConflictException(
+                "You cannot remove yourself through member management"
+        );
+    }
+
+    if (target.getRole() == WorkspaceRole.OWNER) {
+        throw new WorkspaceMemberConflictException(
+                "The workspace owner cannot be removed"
+        );
+    }
+
+    boolean ownerCanRemove = actor.getRole() == WorkspaceRole.OWNER;
+    boolean adminCanRemove = actor.getRole() == WorkspaceRole.ADMIN
+            && target.getRole() == WorkspaceRole.MEMBER;
+
+    if (!ownerCanRemove && !adminCanRemove) {
+        throw new WorkspaceMemberAccessDeniedException(
+                "You do not have permission to remove this workspace member"
+        );
+    }
+
+    channelMemberRepository.deleteAllByWorkspaceIdAndUserId(
+            workspaceId,
+            targetUserId
+    );
+    workspaceMemberRepository.delete(target);
+}
+
+private WorkspaceMember getActorMembership(
+        Long workspaceId,
+        String authenticatedEmail
+) {
+    User currentUser = userRepository
+            .findByEmailIgnoreCase(authenticatedEmail)
+            .orElseThrow(AuthenticatedUserNotFoundException::new);
+
+    workspaceRepository.findById(workspaceId)
+            .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
+
+    return workspaceMemberRepository
+            .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
+            .orElseThrow(() -> new WorkspaceMemberAccessDeniedException(
+                    "You are not a member of this workspace"
+            ));
+}
+
+private WorkspaceMember getTargetMembership(Long workspaceId, Long userId) {
+    return workspaceMemberRepository
+            .findByWorkspaceIdAndUserId(workspaceId, userId)
+            .orElseThrow(() -> new WorkspaceMemberNotFoundException(
+                    workspaceId,
+                    userId
+            ));
 }
 
 private WorkspaceMemberResponse toWorkspaceMemberResponse(
