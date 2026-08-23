@@ -238,6 +238,16 @@ form button:disabled {
     gap: 3px;
 }
 
+.channel-row {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    border-radius: 7px;
+}
+
+.channel-row:hover { background: rgb(255 255 255 / 10%); }
+.channel-row.active { background: #1164a3; }
+
 .channel-item {
     display: flex;
     width: 100%;
@@ -256,12 +266,10 @@ form button:disabled {
 }
 
 .channel-item:hover {
-    background: rgb(255 255 255 / 10%);
     color: white;
 }
 
-.channel-item.active {
-    background: #1164a3;
+.channel-row.active .channel-item {
     color: white;
 }
 
@@ -274,6 +282,8 @@ form button:disabled {
 }
 
 .channel-name {
+    min-width: 0;
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1101,11 +1111,6 @@ form button:disabled {
     }
 
 }
-.channel-settings-button {
-  width: 36px; height: 36px; border: 1px solid #d1d5db; border-radius: 8px;
-  background: white; color: #4b5563; font-size: 18px; cursor: pointer;
-}
-
 .channel-settings-modal { max-height: calc(100vh - 48px); overflow-y: auto; }
 .settings-section-title { margin: 0; color: #1f2937; font-size: 16px; }
 .channel-settings-section { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 24px 24px; padding: 18px; border: 1px solid #e5e7eb; border-radius: 10px; }
@@ -1136,4 +1141,25 @@ form button:disabled {
 @media (max-width: 560px) {
   .channel-settings-section { align-items: stretch; flex-direction: column; }
   .channel-settings-section .secondary-button { width: 100%; }
+}
+
+.sidebar-channel-settings-button {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    margin-right: 5px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #e9d5ea;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.sidebar-channel-settings-button:hover,
+.sidebar-channel-settings-button:focus-visible {
+    background: rgb(255 255 255 / 16%);
+    color: white;
 }

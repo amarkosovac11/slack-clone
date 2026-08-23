@@ -185,8 +185,8 @@
 
       @for (channel of channels(); track channel.id) {
 
-      <button type="button" class="channel-item" [class.active]="selectedChannel()?.id === channel.id"
-        (click)="selectChannel(channel)">
+      <div class="channel-row" [class.active]="selectedChannel()?.id === channel.id">
+      <button type="button" class="channel-item" (click)="selectChannel(channel)">
 
         <span class="channel-symbol">
           {{ channel.privateChannel ? '🔒' : '#' }}
@@ -197,6 +197,12 @@
         </span>
 
       </button>
+      @if (canManageSelectedChannel()) {
+        <button type="button" class="sidebar-channel-settings-button" title="Channel settings"
+          [attr.aria-label]="'Open settings for ' + channel.name"
+          (click)="openChannelSettingsFromSidebar($event, channel)">&#9881;</button>
+      }
+      </div>
 
       }
 
@@ -261,11 +267,6 @@
         <span class="public-access-label">All workspace members</span>
         <span class="public-badge">Public</span>
       </div>
-      }
-
-      @if (canManageSelectedChannel()) {
-        <button type="button" class="channel-settings-button" title="Channel settings"
-          aria-label="Open channel settings" (click)="openChannelSettings()">&#9881;</button>
       }
 
     </header>
