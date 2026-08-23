@@ -325,8 +325,24 @@
                 {{ message.createdAt | date:'shortTime' }}
               </time>
             </div>
-            <p class="message-text">{{ message.content }}</p>
+            @if (message.deletedAt) {
+              <p class="message-text deleted-message">This message was deleted</p>
+            } @else if (editingMessageId() === message.id) {
+              <form class="inline-edit-form" [formGroup]="editMessageForm" (ngSubmit)="saveMessageEdit(message)">
+                <textarea formControlName="content" rows="3" aria-label="Edit message"></textarea>
+                @if (messageMutationError()) { <small class="field-error">{{ messageMutationError() }}</small> }
+                <div class="inline-edit-actions">
+                  <button type="button" [disabled]="messageMutationLoading()" (click)="cancelEditingMessage()">Cancel</button>
+                  <button type="submit" [disabled]="messageMutationLoading()">{{ messageMutationLoading() ? 'Saving...' : 'Save' }}</button>
+                </div>
+              </form>
+            } @else {
+              <p class="message-text">{{ message.content }} @if (isEdited(message)) { <small class="edited-label">(edited)</small> }</p>
+            }
           </div>
+          @if (!message.deletedAt && message.senderId === currentUser()?.id && editingMessageId() !== message.id) {
+            <div class="message-actions"><button type="button" (click)="startEditingMessage(message)">Edit</button></div>
+          }
         </article>
         }
       </div>

@@ -86,6 +86,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly messagesLoading = signal(false);
   readonly messagesError = signal<string | null>(null);
   readonly isSendingMessage = signal(false);
+  readonly editingMessageId = signal<number | null>(null);
+  readonly messageMutationLoading = signal(false);
+  readonly messageMutationError = signal<string | null>(null);
   readonly webSocketConnected: MessageWebSocketService['connected'];
 
   readonly showCreateChannelModal = signal(false);
@@ -152,6 +155,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         Validators.maxLength(4000),
       ],
     ],
+  });
+  readonly editMessageForm = this.formBuilder.nonNullable.group({
+    content: ['', [Validators.required, Validators.maxLength(4000)]],
   });
 
   readonly channelSettingsForm = this.formBuilder.nonNullable.group({
@@ -871,5 +877,43 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       if (Date.parse(message.updatedAt) < Date.parse(current[index].updatedAt)) return current;
       return current.map(existing => existing.id === message.id ? message : existing);
     });
+  }
+
+  startEditingMessage(message: Message): void {
+    if (message.senderId !== this.currentUser()?.id || message.deletedAt) return;
+    this.editingMessageId.set(message.id);
+    this.editMessageForm.reset({ content: message.content ?? '' });
+    this.messageMutationError.set(null);
+  }
+
+  cancelEditingMessage(): void {
+    if (!this.messageMutationLoading()) this.editingMessageId.set(null);
+  }
+
+  saveMessageEdit(message: Message): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+    if (workspaceId === null || !channel || this.editMessageForm.invalid ||
+        this.editingMessageId() !== message.id) {
+      this.editMessageForm.markAllAsTouched(); return;
+    }
+    const content = this.editMessageForm.getRawValue().content.trim();
+    if (!content) { this.editMessageForm.controls.content.setErrors({ required: true }); return; }
+    this.messageMutationLoading.set(true); this.messageMutationError.set(null);
+    this.messageService.updateMessage(workspaceId, channel.id, message.id, { content }).subscribe({
+      next: updated => {
+        this.upsertMessage(updated); this.editingMessageId.set(null);
+        this.messageMutationLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as ApiErrorResponse | undefined;
+        this.messageMutationError.set(apiError?.message ?? 'Could not edit message.');
+        this.messageMutationLoading.set(false);
+      },
+    });
+  }
+
+  isEdited(message: Message): boolean {
+    return !message.deletedAt && Date.parse(message.updatedAt) > Date.parse(message.createdAt) + 1000;
   }
 }
