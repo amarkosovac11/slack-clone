@@ -5,6 +5,7 @@ import com.amar.slackclone.channel.ChannelAccessService;
 import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
 import com.amar.slackclone.message.dto.CreateMessageRequest;
 import com.amar.slackclone.message.dto.MessageResponse;
+import com.amar.slackclone.message.dto.UpdateMessageRequest;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -79,6 +80,34 @@ public class MessageService {
         return response;
     }
 
+    @Transactional
+    public MessageResponse updateMessage(Long workspaceId, Long channelId, Long messageId,
+            UpdateMessageRequest request, String authenticatedEmail) {
+        User user = getAuthenticatedUser(authenticatedEmail);
+        channelAccessService.validateChannelAccess(workspaceId, channelId, authenticatedEmail);
+        Message message = requireMessage(channelId, messageId);
+        requireSender(message, user);
+        requireNotDeleted(message);
+        message.setContent(request.content().trim());
+        message.markUpdated();
+        MessageResponse response = toMessageResponse(message);
+        broadcastAfterCommit(workspaceId, channelId, response);
+        return response;
+    }
+
+    private Message requireMessage(Long channelId, Long messageId) {
+        return messageRepository.findByIdAndChannelId(messageId, channelId)
+                .orElseThrow(() -> new MessageNotFoundException(messageId));
+    }
+
+    private void requireSender(Message message, User user) {
+        if (!message.getSender().getId().equals(user.getId())) throw new MessageAccessDeniedException();
+    }
+
+    private void requireNotDeleted(Message message) {
+        if (message.getDeletedAt() != null) throw new MessageConflictException("Message is already deleted");
+    }
+
     private void broadcastAfterCommit(
         Long workspaceId,
         Long channelId,
@@ -111,9 +140,10 @@ public class MessageService {
             message.getSender().getId(),
             message.getSender().getDisplayName(),
             message.getSender().getEmail(),
-            message.getContent(),
+            message.getDeletedAt() == null ? message.getContent() : null,
             message.getCreatedAt(),
-            message.getUpdatedAt()
+            message.getUpdatedAt(),
+            message.getDeletedAt()
         );
     }
 }

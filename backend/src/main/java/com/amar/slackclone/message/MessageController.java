@@ -2,6 +2,7 @@ package com.amar.slackclone.message;
 
 import com.amar.slackclone.message.dto.CreateMessageRequest;
 import com.amar.slackclone.message.dto.MessageResponse;
+import com.amar.slackclone.message.dto.UpdateMessageRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -52,5 +53,12 @@ public class MessageController {
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(message);
+    }
+
+    @PatchMapping("/{messageId}")
+    public MessageResponse updateMessage(@PathVariable Long workspaceId, @PathVariable Long channelId,
+            @PathVariable Long messageId, @Valid @RequestBody UpdateMessageRequest request,
+            Authentication authentication) {
+        return messageService.updateMessage(workspaceId, channelId, messageId, request, authentication.getName());
     }
 }

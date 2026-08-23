@@ -14,6 +14,9 @@ import com.amar.slackclone.workspace.WorkspaceInvitationNotFoundException;
 import com.amar.slackclone.workspace.WorkspaceMemberAccessDeniedException;
 import com.amar.slackclone.workspace.WorkspaceMemberConflictException;
 import com.amar.slackclone.workspace.WorkspaceMemberNotFoundException;
+import com.amar.slackclone.message.MessageNotFoundException;
+import com.amar.slackclone.message.MessageAccessDeniedException;
+import com.amar.slackclone.message.MessageConflictException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -29,6 +32,21 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MessageNotFoundException.class)
+    public ResponseEntity<ApiError> handleMessageNotFound(MessageNotFoundException e, HttpServletRequest request) {
+        return apiError(HttpStatus.NOT_FOUND, e.getMessage(), request);
+    }
+
+    @ExceptionHandler(MessageAccessDeniedException.class)
+    public ResponseEntity<ApiError> handleMessageAccessDenied(MessageAccessDeniedException e, HttpServletRequest request) {
+        return apiError(HttpStatus.FORBIDDEN, e.getMessage(), request);
+    }
+
+    @ExceptionHandler(MessageConflictException.class)
+    public ResponseEntity<ApiError> handleMessageConflict(MessageConflictException e, HttpServletRequest request) {
+        return apiError(HttpStatus.CONFLICT, e.getMessage(), request);
+    }
 
     @ExceptionHandler(ChannelConflictException.class)
     public ResponseEntity<ApiError> handleChannelConflict(ChannelConflictException exception,
