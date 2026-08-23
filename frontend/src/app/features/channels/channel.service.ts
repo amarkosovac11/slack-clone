@@ -6,7 +6,8 @@ import {
   AddChannelMemberRequest,
   Channel,
   ChannelMember,
-  CreateChannelRequest
+  CreateChannelRequest,
+  UpdateChannelRequest
 } from './channel.models';
 
 @Injectable({
@@ -65,6 +66,25 @@ export class ChannelService {
   ): Observable<void> {
     return this.http.delete<void>(
       `${this.apiUrl}/${workspaceId}/channels/${channelId}/members/${userId}`
+    );
+  }
+
+  updateChannel(workspaceId: number, channelId: number,
+    request: UpdateChannelRequest): Observable<Channel> {
+    return this.http.patch<Channel>(
+      `${this.apiUrl}/${workspaceId}/channels/${channelId}`, request
+    );
+  }
+
+  archiveChannel(workspaceId: number, channelId: number): Observable<Channel> {
+    return this.http.post<Channel>(
+      `${this.apiUrl}/${workspaceId}/channels/${channelId}/archive`, {}
+    );
+  }
+
+  deleteChannel(workspaceId: number, channelId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/${workspaceId}/channels/${channelId}`
     );
   }
 }
