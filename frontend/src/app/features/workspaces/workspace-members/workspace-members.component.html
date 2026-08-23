@@ -56,11 +56,67 @@
                 >
                   {{ member.role }}
                 </span>
+                @if (currentUserRole() === 'OWNER' && member.role !== 'OWNER') {
+                  <label class="role-control">
+                    <span class="visually-hidden">Role for {{ member.displayName }}</span>
+                    <select
+                      [value]="member.role"
+                      [disabled]="actionUserId() === member.userId"
+                      (change)="changeRoleFromEvent(member, $event)"
+                    >
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </label>
+                }
+                @if (canRemove(member)) {
+                  <button
+                    type="button"
+                    class="remove-button"
+                    [disabled]="actionUserId() === member.userId"
+                    (click)="requestRemoval(member)"
+                  >
+                    Remove
+                  </button>
+                }
               </article>
             }
           </div>
         }
       </div>
+
+      @if (memberPendingRemoval(); as member) {
+        <div class="confirmation-backdrop" role="presentation" (click)="cancelRemoval()">
+          <section
+            class="confirmation-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="remove-member-title"
+            (click)="$event.stopPropagation()"
+          >
+            <h3 id="remove-member-title">
+              Remove {{ member.displayName }} from {{ workspaceName() }}?
+            </h3>
+            <p>They will lose access to this workspace and its channels.</p>
+            <div class="confirmation-actions">
+              <button
+                type="button"
+                class="cancel-button"
+                [disabled]="actionUserId() !== null"
+                (click)="cancelRemoval()"
+              >Cancel</button>
+              <button
+                type="button"
+                class="confirm-remove-button"
+                [disabled]="actionUserId() !== null"
+                (click)="confirmRemoval()"
+              >
+                {{ actionUserId() === member.userId ? 'Removing...' : 'Remove member' }}
+              </button>
+            </div>
+          </section>
+        </div>
+      }
     </section>
   </div>
 }

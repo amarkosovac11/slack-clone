@@ -5,7 +5,8 @@ import { Observable } from 'rxjs';
 import {
   CreateWorkspaceRequest,
   WorkspaceMember,
-  WorkspaceResponse
+  WorkspaceResponse,
+  UpdateWorkspaceMemberRoleRequest
 } from './workspace.models';
 
 @Injectable({ providedIn: 'root' })
@@ -25,6 +26,23 @@ export class WorkspaceService {
   getWorkspaceMembers(workspaceId: number): Observable<WorkspaceMember[]> {
     return this.http.get<WorkspaceMember[]>(
       `${this.apiUrl}/${workspaceId}/members`
+    );
+  }
+
+  updateWorkspaceMemberRole(
+    workspaceId: number,
+    userId: number,
+    request: UpdateWorkspaceMemberRoleRequest,
+  ): Observable<WorkspaceMember> {
+    return this.http.patch<WorkspaceMember>(
+      `${this.apiUrl}/${workspaceId}/members/${userId}/role`,
+      request,
+    );
+  }
+
+  removeWorkspaceMember(workspaceId: number, userId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/${workspaceId}/members/${userId}`,
     );
   }
 }
