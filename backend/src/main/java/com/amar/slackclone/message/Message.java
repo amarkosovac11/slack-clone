@@ -95,4 +95,6 @@ public class Message {
     public void setDeletedAt(OffsetDateTime deletedAt) {
         this.deletedAt = deletedAt;
     }
+
+    public void markUpdated() { this.updatedAt = OffsetDateTime.now(); }
 }

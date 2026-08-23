@@ -14,7 +14,8 @@ public record MessageResponse(
     String content,
 
     OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    OffsetDateTime updatedAt,
+    OffsetDateTime deletedAt
 
 ) {
 }

@@ -86,6 +86,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly messagesLoading = signal(false);
   readonly messagesError = signal<string | null>(null);
   readonly isSendingMessage = signal(false);
+  readonly editingMessageId = signal<number | null>(null);
+  readonly messageMutationLoading = signal(false);
+  readonly messageMutationError = signal<string | null>(null);
+  readonly messagePendingDelete = signal<Message | null>(null);
   readonly webSocketConnected: MessageWebSocketService['connected'];
 
   readonly showCreateChannelModal = signal(false);
@@ -152,6 +156,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         Validators.maxLength(4000),
       ],
     ],
+  });
+  readonly editMessageForm = this.formBuilder.nonNullable.group({
+    content: ['', [Validators.required, Validators.maxLength(4000)]],
   });
 
   readonly channelSettingsForm = this.formBuilder.nonNullable.group({
@@ -489,7 +496,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
             return;
           }
 
-          this.appendMessageIfAbsent(message);
+          this.upsertMessage(message);
           this.messageForm.reset({ content: '' });
           this.isSendingMessage.set(false);
         },
@@ -695,6 +702,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.messagesLoading.set(false);
     this.messageForm.reset({ content: '' });
     this.isSendingMessage.set(false);
+    this.editingMessageId.set(null);
+    this.messagePendingDelete.set(null);
+    this.messageMutationLoading.set(false);
+    this.messageMutationError.set(null);
 
     this.channels.set([]);
     this.channelsError.set(null);
@@ -755,7 +766,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           this.selectedChannel()?.id === channelId &&
           message.channelId === channelId
         ) {
-          this.appendMessageIfAbsent(message);
+          this.upsertMessage(message);
         }
       },
     );
@@ -775,12 +786,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           return;
         }
 
-        const historyIds = new Set(messages.map((message) => message.id));
-        const messagesReceivedDuringLoad = this.messages().filter(
-          (message) => !historyIds.has(message.id)
-        );
-
-        this.messages.set([...messages, ...messagesReceivedDuringLoad]);
+        const merged = new Map(messages.map(message => [message.id, message]));
+        for (const liveMessage of this.messages()) {
+          const historyMessage = merged.get(liveMessage.id);
+          if (!historyMessage || Date.parse(liveMessage.updatedAt) > Date.parse(historyMessage.updatedAt)) {
+            merged.set(liveMessage.id, liveMessage);
+          }
+        }
+        this.messages.set([...merged.values()].sort(
+          (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)
+        ));
         this.messagesLoading.set(false);
       },
       error: (error: HttpErrorResponse) => {
@@ -860,11 +875,82 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/login']);
   }
 
-  private appendMessageIfAbsent(message: Message): void {
-    this.messages.update((current) =>
-      current.some((existing) => existing.id === message.id)
-        ? current
-        : [...current, message]
-    );
+  private upsertMessage(message: Message): void {
+    if (message.deletedAt && this.editingMessageId() === message.id) {
+      this.editingMessageId.set(null);
+    }
+    this.messages.update((current) => {
+      const index = current.findIndex(existing => existing.id === message.id);
+      if (index === -1) return [...current, message];
+      if (Date.parse(message.updatedAt) < Date.parse(current[index].updatedAt)) return current;
+      return current.map(existing => existing.id === message.id ? message : existing);
+    });
+  }
+
+  startEditingMessage(message: Message): void {
+    if (message.senderId !== this.currentUser()?.id || message.deletedAt) return;
+    this.editingMessageId.set(message.id);
+    this.editMessageForm.reset({ content: message.content ?? '' });
+    this.messageMutationError.set(null);
+  }
+
+  cancelEditingMessage(): void {
+    if (!this.messageMutationLoading()) this.editingMessageId.set(null);
+  }
+
+  saveMessageEdit(message: Message): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+    if (workspaceId === null || !channel || this.editMessageForm.invalid ||
+        this.editingMessageId() !== message.id) {
+      this.editMessageForm.markAllAsTouched(); return;
+    }
+    const content = this.editMessageForm.getRawValue().content.trim();
+    if (!content) { this.editMessageForm.controls.content.setErrors({ required: true }); return; }
+    this.messageMutationLoading.set(true); this.messageMutationError.set(null);
+    this.messageService.updateMessage(workspaceId, channel.id, message.id, { content }).subscribe({
+      next: updated => {
+        this.upsertMessage(updated); this.editingMessageId.set(null);
+        this.messageMutationLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as ApiErrorResponse | undefined;
+        this.messageMutationError.set(apiError?.message ?? 'Could not edit message.');
+        this.messageMutationLoading.set(false);
+      },
+    });
+  }
+
+  isEdited(message: Message): boolean {
+    return !message.deletedAt && message.updatedAt !== message.createdAt;
+  }
+
+  requestMessageDelete(message: Message): void {
+    if (message.senderId === this.currentUser()?.id && !message.deletedAt) {
+      this.messagePendingDelete.set(message); this.messageMutationError.set(null);
+    }
+  }
+
+  cancelMessageDelete(): void {
+    if (!this.messageMutationLoading()) this.messagePendingDelete.set(null);
+  }
+
+  confirmMessageDelete(): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+    const message = this.messagePendingDelete();
+    if (workspaceId === null || !channel || !message) return;
+    this.messageMutationLoading.set(true); this.messageMutationError.set(null);
+    this.messageService.deleteMessage(workspaceId, channel.id, message.id).subscribe({
+      next: deleted => {
+        this.upsertMessage(deleted); this.messagePendingDelete.set(null);
+        this.messageMutationLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as ApiErrorResponse | undefined;
+        this.messageMutationError.set(apiError?.message ?? 'Could not delete message.');
+        this.messageMutationLoading.set(false);
+      },
+    });
   }
 }

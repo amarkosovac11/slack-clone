@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import {
   CreateMessageRequest,
   Message,
+  UpdateMessageRequest,
 } from './message.models';
 
 @Injectable({
@@ -35,6 +36,20 @@ export class MessageService {
     return this.http.post<Message>(
       `${this.apiUrl}/${workspaceId}/channels/${channelId}/messages`,
       request
+    );
+  }
+
+  updateMessage(workspaceId: number, channelId: number, messageId: number,
+    request: UpdateMessageRequest): Observable<Message> {
+    return this.http.patch<Message>(
+      `${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}`,
+      request,
+    );
+  }
+
+  deleteMessage(workspaceId: number, channelId: number, messageId: number): Observable<Message> {
+    return this.http.delete<Message>(
+      `${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}`,
     );
   }
 }
