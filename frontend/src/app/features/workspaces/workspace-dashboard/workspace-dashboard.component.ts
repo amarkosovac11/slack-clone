@@ -342,6 +342,14 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.showChannelSettingsModal.set(true);
   }
 
+  workspaceInitial(name: string): string {
+    return name.trim().charAt(0).toUpperCase() || 'W';
+  }
+
+  userInitial(): string {
+    return this.currentUser()?.displayName.trim().charAt(0).toUpperCase() || 'U';
+  }
+
   openChannelSettingsFromSidebar(event: Event, channel: Channel): void {
     event.stopPropagation();
     const workspaceId = this.selectedWorkspaceId();
@@ -854,6 +862,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         this.isLoading.set(false);
 
         this.syncSelectionFromRoute();
+        if (this.selectedWorkspaceId() === null && workspaces.length > 0) {
+          this.selectWorkspace(workspaces[0].id);
+        }
       },
       error: () => {
         this.errorMessage.set('Could not load workspaces.');

@@ -1,6 +1,7 @@
 :host {
     display: block;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
     background: #f5f3ff;
 }
 
@@ -54,76 +55,6 @@
     color: #6b7280;
 }
 
-/* WORKSPACE TOOLBAR */
-
-.workspace-toolbar {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    padding: 14px 16px;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    background: white;
-    box-shadow: 0 8px 24px rgb(17 24 39 / 5%);
-}
-
-.workspace-switcher {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.workspace-switcher label {
-    color: #6b7280;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.workspace-switcher select {
-    min-width: 250px;
-    padding: 9px 34px 9px 11px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    background: white;
-    color: #1f2937;
-    font: inherit;
-    font-weight: 700;
-}
-
-.workspace-loading {
-    min-height: 38px;
-    color: #6b7280;
-    font-size: 13px;
-    line-height: 38px;
-}
-
-.workspace-toolbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.create-workspace-button {
-    min-height: 40px;
-    padding: 9px 13px;
-    border: 0;
-    border-radius: 9px;
-    background: #611f69;
-    color: white;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.create-workspace-button:hover {
-    background: #4a154b;
-}
-
 form {
     display: flex;
     gap: 12px;
@@ -171,12 +102,11 @@ form button:disabled {
 
 .workspace-view {
     display: grid;
-    grid-template-columns: 270px minmax(0, 1fr);
-    min-height: calc(100vh - 190px);
-    margin-top: 14px;
+    grid-template-columns: 68px 270px minmax(0, 1fr);
+    height: 100vh;
     overflow: hidden;
     border: 1px solid #d1d5db;
-    border-radius: 16px;
+    border-radius: 0;
     background: white;
     box-shadow: 0 16px 40px rgb(17 24 39 / 8%);
 }
@@ -237,6 +167,25 @@ form button:disabled {
     flex-direction: column;
     gap: 3px;
 }
+
+.workspace-rail {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 8px;
+    background: #260027;
+    color: white;
+}
+
+.workspace-rail-list { display: flex; width: 100%; flex-direction: column; align-items: center; gap: 9px; overflow-y: auto; }
+.workspace-rail-button { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border: 0; border-radius: 13px; background: #5b365d; color: white; font: inherit; font-weight: 800; cursor: pointer; transition: border-radius .15s, background .15s; }
+.workspace-rail-button:hover, .workspace-rail-button:focus-visible { border-radius: 9px; background: #7c3a83; outline: 2px solid #d8b4fe; outline-offset: 2px; }
+.workspace-rail-button.active { border-radius: 9px; background: #f8f4f9; color: #3f0e40; box-shadow: -4px 0 0 #fff; }
+.create-rail-button { background: #3f2341; font-size: 24px; }
+.user-rail-button { border-radius: 50%; background: #1264a3; }
+.rail-invitations { width: 44px; }
 
 .channel-row {
     display: flex;
@@ -371,27 +320,6 @@ form button:disabled {
     flex: 0 0 auto;
     align-items: center;
     gap: 10px;
-}
-
-.channel-member-count {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 7px 9px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    background: white;
-    color: #4b5563;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.channel-member-count:hover {
-    border-color: #c4b5fd;
-    background: #faf5ff;
-    color: #611f69;
 }
 
 .public-access-label {
@@ -1080,7 +1008,8 @@ form button:disabled {
         display: block;
     }
 
-    .channel-sidebar {
+.channel-sidebar {
+    overflow-y: auto;
         border-radius: 0;
     }
 
@@ -1142,6 +1071,8 @@ form button:disabled {
   .channel-settings-section { align-items: stretch; flex-direction: column; }
   .channel-settings-section .secondary-button { width: 100%; }
 }
+
+.sidebar-role { display: inline-block; margin-top: 5px; padding: 2px 6px; border-radius: 999px; background: rgb(255 255 255 / 12%); color: #e9d5ea; font-size: 10px; font-weight: 800; }
 
 .sidebar-channel-settings-button {
     display: grid;
