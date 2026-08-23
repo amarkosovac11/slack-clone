@@ -57,6 +57,10 @@ public class ChannelAccessService {
             .findByIdAndWorkspaceId(channelId, workspaceId)
             .orElseThrow(() -> new ChannelNotFoundException(channelId));
 
+        if (channel.isArchived()) {
+            throw new ChannelConflictException("Channel is archived and unavailable");
+        }
+
         if (channel.isPrivateChannel()
             && !channelMemberRepository.existsByChannelIdAndUserId(
                 channelId,
