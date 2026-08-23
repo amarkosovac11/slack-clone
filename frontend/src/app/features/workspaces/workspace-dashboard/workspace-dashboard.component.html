@@ -143,6 +143,8 @@
       <app-workspace-members
         [workspaceId]="selectedWorkspace()!.id"
         [workspaceName]="selectedWorkspace()!.name"
+        [currentUserRole]="selectedWorkspace()!.currentUserRole"
+        [currentUserId]="currentUser()!.id"
       />
 
     @if (canManageSelectedWorkspaceInvitations()) {

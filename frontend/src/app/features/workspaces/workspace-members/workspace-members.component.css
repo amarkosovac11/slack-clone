@@ -177,6 +177,31 @@
   font-weight: 800;
 }
 
+.role-control select {
+  padding: 6px 26px 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: white;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+}
+
+.role-control select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .role-owner {
   background: #f3e8ff;
   color: #6b21a8;

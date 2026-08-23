@@ -21,3 +21,7 @@ export interface WorkspaceMember {
   role: WorkspaceRole;
   joinedAt: string;
 }
+
+export interface UpdateWorkspaceMemberRoleRequest {
+  role: Exclude<WorkspaceRole, 'OWNER'>;
+}

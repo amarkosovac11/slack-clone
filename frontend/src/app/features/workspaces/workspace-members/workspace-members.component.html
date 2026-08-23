@@ -56,6 +56,19 @@
                 >
                   {{ member.role }}
                 </span>
+                @if (currentUserRole() === 'OWNER' && member.role !== 'OWNER') {
+                  <label class="role-control">
+                    <span class="visually-hidden">Role for {{ member.displayName }}</span>
+                    <select
+                      [value]="member.role"
+                      [disabled]="actionUserId() === member.userId"
+                      (change)="changeRoleFromEvent(member, $event)"
+                    >
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </label>
+                }
               </article>
             }
           </div>
