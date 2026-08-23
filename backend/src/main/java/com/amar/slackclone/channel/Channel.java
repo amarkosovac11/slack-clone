@@ -48,6 +48,9 @@ public class Channel {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "archived_at")
+    private OffsetDateTime archivedAt;
+
     @PrePersist
     void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();
@@ -125,4 +128,10 @@ public class Channel {
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
     }
+
+    public OffsetDateTime getArchivedAt() { return archivedAt; }
+
+    public void setArchivedAt(OffsetDateTime archivedAt) { this.archivedAt = archivedAt; }
+
+    public boolean isArchived() { return archivedAt != null; }
 }

@@ -395,7 +395,8 @@ public class ChannelService {
                 channel.isPrivateChannel(),
                 channel.getCreatedBy().getId(),
                 channel.getCreatedAt(),
-                channel.getUpdatedAt()
+                channel.getUpdatedAt(),
+                channel.getArchivedAt()
         );
     }
 }

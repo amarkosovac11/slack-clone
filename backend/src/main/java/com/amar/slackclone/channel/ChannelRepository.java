@@ -27,6 +27,7 @@ public interface ChannelRepository extends JpaRepository<Channel, Long> {
             ON cm.channel = c
             AND cm.user.id = :userId
         WHERE c.workspace.id = :workspaceId
+          AND c.archivedAt IS NULL
           AND (
               c.privateChannel = false
               OR cm.id IS NOT NULL
