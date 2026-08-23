@@ -43,6 +43,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly errorMessage = signal('');
   readonly showCreateWorkspaceModal = signal(false);
   readonly workspaceCreateError = signal<string | null>(null);
+  readonly showProfilePlaceholder = signal(false);
 
   readonly currentUser: AuthService['currentUser'];
 
@@ -348,6 +349,14 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   userInitial(): string {
     return this.currentUser()?.displayName.trim().charAt(0).toUpperCase() || 'U';
+  }
+
+  toggleProfilePlaceholder(): void {
+    this.showProfilePlaceholder.update((visible) => !visible);
+  }
+
+  closeProfilePlaceholder(): void {
+    this.showProfilePlaceholder.set(false);
   }
 
   openChannelSettingsFromSidebar(event: Event, channel: Channel): void {

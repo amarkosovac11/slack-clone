@@ -97,8 +97,22 @@
       <app-pending-workspace-invitations class="rail-invitations" [compact]="true"
         (invitationAccepted)="loadWorkspaces()" />
     </div>
-    <button type="button" class="workspace-rail-button user-rail-button"
-      title="Account options coming soon" aria-label="Current user profile">{{ userInitial() }}</button>
+    <div class="profile-rail-entry">
+      <button type="button" class="workspace-rail-button user-rail-button"
+        title="Account" aria-label="Open account menu" aria-haspopup="dialog"
+        [attr.aria-expanded]="showProfilePlaceholder()"
+        (click)="toggleProfilePlaceholder()">{{ userInitial() }}</button>
+      @if (showProfilePlaceholder()) {
+        <section class="profile-placeholder" role="dialog" aria-label="Account menu">
+          <div class="profile-placeholder-header">
+            <span class="profile-placeholder-avatar">{{ userInitial() }}</span>
+            <div><strong>{{ currentUser()?.displayName }}</strong><small>{{ currentUser()?.email }}</small></div>
+          </div>
+          <p>Profile and account options are coming soon.</p>
+          <button type="button" class="secondary-button" (click)="closeProfilePlaceholder()">Got it</button>
+        </section>
+      }
+    </div>
   </nav>
 
   <aside class="channel-sidebar">
