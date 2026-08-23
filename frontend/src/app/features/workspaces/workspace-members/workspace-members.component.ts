@@ -24,6 +24,7 @@ export class WorkspaceMembersComponent {
   readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly actionUserId = signal<number | null>(null);
+  readonly memberPendingRemoval = signal<WorkspaceMember | null>(null);
 
   private previousWorkspaceId: number | null = null;
 
@@ -82,6 +83,7 @@ export class WorkspaceMembersComponent {
     this.isLoading.set(false);
     this.errorMessage.set(null);
     this.actionUserId.set(null);
+    this.memberPendingRemoval.set(null);
   }
 
   changeRole(member: WorkspaceMember, role: 'ADMIN' | 'MEMBER'): void {
@@ -115,5 +117,53 @@ export class WorkspaceMembersComponent {
     if (role === 'ADMIN' || role === 'MEMBER') {
       this.changeRole(member, role);
     }
+  }
+
+  canRemove(member: WorkspaceMember): boolean {
+    if (member.userId === this.currentUserId() || member.role === 'OWNER') {
+      return false;
+    }
+    return this.currentUserRole() === 'OWNER'
+      || (this.currentUserRole() === 'ADMIN' && member.role === 'MEMBER');
+  }
+
+  requestRemoval(member: WorkspaceMember): void {
+    if (this.canRemove(member)) {
+      this.memberPendingRemoval.set(member);
+    }
+  }
+
+  cancelRemoval(): void {
+    if (this.actionUserId() === null) {
+      this.memberPendingRemoval.set(null);
+    }
+  }
+
+  confirmRemoval(): void {
+    const member = this.memberPendingRemoval();
+    if (!member || !this.canRemove(member)) {
+      return;
+    }
+
+    this.actionUserId.set(member.userId);
+    this.errorMessage.set(null);
+    this.workspaceService.removeWorkspaceMember(
+      this.workspaceId(),
+      member.userId,
+    ).subscribe({
+      next: () => {
+        this.members.update((members) =>
+          members.filter((current) => current.userId !== member.userId)
+        );
+        this.memberPendingRemoval.set(null);
+        this.actionUserId.set(null);
+      },
+      error: (error: HttpErrorResponse) => {
+        const apiError = error.error as ApiErrorResponse | undefined;
+        this.errorMessage.set(apiError?.message ?? 'Could not remove workspace member.');
+        this.memberPendingRemoval.set(null);
+        this.actionUserId.set(null);
+      },
+    });
   }
 }

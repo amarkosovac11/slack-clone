@@ -41,6 +41,7 @@
 }
 
 .members-modal {
+  position: relative;
   width: min(620px, 100%);
   max-height: min(760px, calc(100vh - 48px));
   overflow: hidden;
@@ -192,6 +193,86 @@
   opacity: 0.6;
 }
 
+.remove-button {
+  padding: 6px 9px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.remove-button:hover {
+  background: #fef2f2;
+}
+
+.remove-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.confirmation-backdrop {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(17 24 39 / 45%);
+}
+
+.confirmation-dialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 18px 45px rgb(0 0 0 / 22%);
+}
+
+.confirmation-dialog h3,
+.confirmation-dialog p {
+  margin: 0;
+}
+
+.confirmation-dialog p {
+  margin-top: 10px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.confirmation-actions button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.confirmation-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.cancel-button {
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #374151;
+}
+
+.confirm-remove-button {
+  border: 1px solid #b91c1c;
+  background: #b91c1c;
+  color: white;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -220,5 +301,6 @@
 @media (max-width: 500px) {
   .member-row {
     align-items: flex-start;
+    flex-wrap: wrap;
   }
 }

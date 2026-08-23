@@ -39,4 +39,10 @@ export class WorkspaceService {
       request,
     );
   }
+
+  removeWorkspaceMember(workspaceId: number, userId: number): Observable<void> {
+    return this.http.delete<void>(
+      `${this.apiUrl}/${workspaceId}/members/${userId}`,
+    );
+  }
 }
