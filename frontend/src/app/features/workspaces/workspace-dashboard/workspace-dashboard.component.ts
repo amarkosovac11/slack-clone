@@ -348,6 +348,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.lifecycleConfirmation.set(null);
   }
 
+  manageMembersFromChannelSettings(): void {
+    if (!this.canManageSelectedChannelMembers() || this.channelSettingsLoading()) {
+      return;
+    }
+
+    this.showChannelSettingsModal.set(false);
+    this.lifecycleConfirmation.set(null);
+    this.openChannelMembersModal();
+  }
+
   saveChannelSettings(): void {
     const workspaceId = this.selectedWorkspaceId();
     const channel = this.selectedChannel();

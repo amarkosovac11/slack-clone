@@ -255,15 +255,6 @@
           Private
         </span>
 
-        @if (canManageSelectedChannelMembers()) {
-        <button
-          type="button"
-          class="manage-members-button"
-          (click)="openChannelMembersModal()"
-        >
-          Manage members
-        </button>
-        }
       </div>
       } @else {
       <div class="channel-header-actions">
@@ -679,6 +670,7 @@
           aria-label="Close channel settings" (click)="closeChannelSettings()">&times;</button>
       </header>
       <form class="create-channel-form" [formGroup]="channelSettingsForm" (ngSubmit)="saveChannelSettings()">
+        <h3 class="settings-section-title">General</h3>
         <div class="form-field"><label for="settings-channel-name">Channel name</label>
           <input id="settings-channel-name" formControlName="name" />
           @if (channelSettingsForm.controls.name.touched && channelSettingsForm.controls.name.invalid) {
@@ -691,10 +683,25 @@
         @if (channelSettingsError()) { <div class="modal-error">{{ channelSettingsError() }}</div> }
         @if (channelSettingsSuccess()) { <div class="settings-success">{{ channelSettingsSuccess() }}</div> }
         <div class="modal-actions"><button type="submit" class="primary-button"
-          [disabled]="channelSettingsLoading()">{{ channelSettingsLoading() ? 'Saving...' : 'Save' }}</button></div>
+          [disabled]="channelSettingsLoading()">{{ channelSettingsLoading() ? 'Saving...' : 'Save changes' }}</button></div>
       </form>
+      @if (channel.privateChannel && canManageSelectedChannelMembers()) {
+        <section class="channel-settings-section members-settings-section">
+          <div>
+            <h3>Members</h3>
+            <p>
+              {{ channelMemberCount() ?? '...' }} current
+              {{ channelMemberCount() === 1 ? 'member' : 'members' }}.
+              Add or remove people with access to this private channel.
+            </p>
+          </div>
+          <button type="button" class="secondary-button" (click)="manageMembersFromChannelSettings()">
+            Manage members
+          </button>
+        </section>
+      }
       <section class="danger-zone">
-        <h3>Channel lifecycle</h3>
+        <h3>Danger zone</h3>
         <p>Archiving preserves history but prevents new messages. Deletion is permanent.</p>
         @if (lifecycleConfirmation() === null) {
           <div class="danger-actions">
