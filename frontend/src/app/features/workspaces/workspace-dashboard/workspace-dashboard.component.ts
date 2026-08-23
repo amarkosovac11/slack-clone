@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
 
 import { ApiErrorResponse } from '../../../core/auth/auth.models';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -73,6 +73,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     return channel?.privateChannel === true &&
       (role === 'OWNER' || role === 'ADMIN');
   });
+  readonly canManageSelectedChannel = computed(() => {
+    const role = this.selectedWorkspaceRole();
+    return role === 'OWNER' || role === 'ADMIN';
+  });
 
   readonly channels = signal<Channel[]>([]);
   readonly channelsLoading = signal(false);
@@ -95,6 +99,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly membersLoading = signal(false);
   readonly membersError = signal<string | null>(null);
   readonly memberActionUserId = signal<number | null>(null);
+  readonly showChannelSettingsModal = signal(false);
+  readonly channelSettingsLoading = signal(false);
+  readonly channelSettingsError = signal<string | null>(null);
+  readonly channelSettingsSuccess = signal<string | null>(null);
+  readonly lifecycleConfirmation = signal<'archive' | 'delete' | null>(null);
 
   readonly availableWorkspaceMembers = computed(() => {
     const channelMemberIds = new Set(
@@ -143,6 +152,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         Validators.maxLength(4000),
       ],
     ],
+  });
+
+  readonly channelSettingsForm = this.formBuilder.nonNullable.group({
+    name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
+    description: ['', [Validators.maxLength(255)]],
   });
 
   constructor(
@@ -309,6 +323,72 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.showCreateChannelModal.set(false);
     this.channelCreateError.set(null);
+  }
+
+  openChannelSettings(): void {
+    const channel = this.selectedChannel();
+    if (!channel || !this.canManageSelectedChannel()) return;
+    this.channelSettingsForm.reset({ name: channel.name, description: channel.description ?? '' });
+    this.channelSettingsError.set(null);
+    this.channelSettingsSuccess.set(null);
+    this.lifecycleConfirmation.set(null);
+    this.showChannelSettingsModal.set(true);
+  }
+
+  closeChannelSettings(): void {
+    if (this.channelSettingsLoading()) return;
+    this.showChannelSettingsModal.set(false);
+    this.lifecycleConfirmation.set(null);
+  }
+
+  saveChannelSettings(): void {
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+    if (workspaceId === null || !channel || this.channelSettingsForm.invalid) {
+      this.channelSettingsForm.markAllAsTouched(); return;
+    }
+    this.channelSettingsLoading.set(true); this.channelSettingsError.set(null);
+    const value = this.channelSettingsForm.getRawValue();
+    this.channelService.updateChannel(workspaceId, channel.id, {
+      name: value.name.trim(), description: value.description.trim() || null,
+    }).subscribe({
+      next: updated => {
+        this.selectedChannel.set(updated);
+        this.channels.update(items => items.map(item => item.id === updated.id ? updated : item));
+        this.channelSettingsSuccess.set('Channel settings saved.');
+        this.channelSettingsLoading.set(false);
+      },
+      error: (error: HttpErrorResponse) => this.handleChannelSettingsError(error),
+    });
+  }
+
+  confirmChannelLifecycle(): void {
+    const action = this.lifecycleConfirmation();
+    const workspaceId = this.selectedWorkspaceId();
+    const channel = this.selectedChannel();
+    if (!action || workspaceId === null || !channel) return;
+    this.channelSettingsLoading.set(true); this.channelSettingsError.set(null);
+    const request: Observable<unknown> = action === 'archive'
+      ? this.channelService.archiveChannel(workspaceId, channel.id)
+      : this.channelService.deleteChannel(workspaceId, channel.id);
+    request.subscribe({
+      next: () => this.leaveInactiveChannel(channel.id),
+      error: (error: HttpErrorResponse) => this.handleChannelSettingsError(error),
+    });
+  }
+
+  private handleChannelSettingsError(error: HttpErrorResponse): void {
+    const apiError = error.error as ApiErrorResponse | undefined;
+    this.channelSettingsError.set(apiError?.message ?? 'Could not update channel.');
+    this.channelSettingsLoading.set(false);
+  }
+
+  private leaveInactiveChannel(channelId: number): void {
+    this.messageWebSocketService.unsubscribeFromChannel();
+    this.channels.update(items => items.filter(item => item.id !== channelId));
+    this.selectedChannel.set(null); this.messages.set([]); this.messagesError.set(null);
+    this.showChannelSettingsModal.set(false); this.channelSettingsLoading.set(false);
+    void this.router.navigate(['/workspaces']);
   }
 
   createChannel(): void {

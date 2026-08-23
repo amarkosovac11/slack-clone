@@ -11,6 +11,7 @@ public record ChannelResponse(
     boolean privateChannel,
     Long createdById,
     OffsetDateTime createdAt,
-    OffsetDateTime updatedAt
+    OffsetDateTime updatedAt,
+    OffsetDateTime archivedAt
 ) {
 }

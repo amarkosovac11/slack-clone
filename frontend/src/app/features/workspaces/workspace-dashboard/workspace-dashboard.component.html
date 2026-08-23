@@ -272,6 +272,11 @@
       </div>
       }
 
+      @if (canManageSelectedChannel()) {
+        <button type="button" class="channel-settings-button" title="Channel settings"
+          aria-label="Open channel settings" (click)="openChannelSettings()">&#9881;</button>
+      }
+
     </header>
 
     <div class="message-area">
@@ -644,4 +649,52 @@
   </div>
 </div>
 
+}
+@if (showChannelSettingsModal() && selectedChannel(); as channel) {
+  <div class="modal-backdrop" role="presentation" (click)="closeChannelSettings()">
+    <section class="create-channel-modal channel-settings-modal" role="dialog" aria-modal="true"
+      aria-labelledby="channel-settings-title" (click)="$event.stopPropagation()">
+      <header class="modal-header">
+        <div><h2 id="channel-settings-title">Channel settings</h2><p>#{{ channel.name }}</p></div>
+        <button type="button" class="modal-close-button" [disabled]="channelSettingsLoading()"
+          aria-label="Close channel settings" (click)="closeChannelSettings()">&times;</button>
+      </header>
+      <form class="create-channel-form" [formGroup]="channelSettingsForm" (ngSubmit)="saveChannelSettings()">
+        <div class="form-field"><label for="settings-channel-name">Channel name</label>
+          <input id="settings-channel-name" formControlName="name" />
+          @if (channelSettingsForm.controls.name.touched && channelSettingsForm.controls.name.invalid) {
+            <small class="field-error">Channel name must have between 2 and 100 characters.</small>
+          }
+        </div>
+        <div class="form-field"><label for="settings-channel-description">Description</label>
+          <textarea id="settings-channel-description" formControlName="description" rows="3"></textarea>
+        </div>
+        @if (channelSettingsError()) { <div class="modal-error">{{ channelSettingsError() }}</div> }
+        @if (channelSettingsSuccess()) { <div class="settings-success">{{ channelSettingsSuccess() }}</div> }
+        <div class="modal-actions"><button type="submit" class="primary-button"
+          [disabled]="channelSettingsLoading()">{{ channelSettingsLoading() ? 'Saving...' : 'Save' }}</button></div>
+      </form>
+      <section class="danger-zone">
+        <h3>Channel lifecycle</h3>
+        <p>Archiving preserves history but prevents new messages. Deletion is permanent.</p>
+        @if (lifecycleConfirmation() === null) {
+          <div class="danger-actions">
+            <button type="button" class="secondary-button" (click)="lifecycleConfirmation.set('archive')">Archive channel</button>
+            <button type="button" class="delete-channel-button" (click)="lifecycleConfirmation.set('delete')">Delete channel</button>
+          </div>
+        } @else {
+          <div class="lifecycle-confirmation">
+            <strong>{{ lifecycleConfirmation() === 'archive' ? 'Archive' : 'Delete' }} #{{ channel.name }}{{ lifecycleConfirmation() === 'delete' ? ' permanently' : '' }}?</strong>
+            <p>{{ lifecycleConfirmation() === 'archive' ? 'History will remain, but users cannot send new messages.' : 'Messages and channel membership data will be permanently removed.' }}</p>
+            <div class="danger-actions">
+              <button type="button" class="secondary-button" [disabled]="channelSettingsLoading()" (click)="lifecycleConfirmation.set(null)">Cancel</button>
+              <button type="button" class="delete-channel-button" [disabled]="channelSettingsLoading()" (click)="confirmChannelLifecycle()">
+                {{ channelSettingsLoading() ? 'Working...' : 'Confirm' }}
+              </button>
+            </div>
+          </div>
+        }
+      </section>
+    </section>
+  </div>
 }

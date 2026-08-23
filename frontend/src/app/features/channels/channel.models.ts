@@ -8,6 +8,12 @@ export interface Channel {
   createdById: number;
   createdAt: string;
   updatedAt: string;
+  archivedAt: string | null;
+}
+
+export interface UpdateChannelRequest {
+  name: string;
+  description: string | null;
 }
 
 export interface CreateChannelRequest {
