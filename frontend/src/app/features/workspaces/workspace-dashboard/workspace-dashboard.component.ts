@@ -702,6 +702,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.messagesLoading.set(false);
     this.messageForm.reset({ content: '' });
     this.isSendingMessage.set(false);
+    this.editingMessageId.set(null);
+    this.messagePendingDelete.set(null);
+    this.messageMutationLoading.set(false);
+    this.messageMutationError.set(null);
 
     this.channels.set([]);
     this.channelsError.set(null);
@@ -872,6 +876,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   private upsertMessage(message: Message): void {
+    if (message.deletedAt && this.editingMessageId() === message.id) {
+      this.editingMessageId.set(null);
+    }
     this.messages.update((current) => {
       const index = current.findIndex(existing => existing.id === message.id);
       if (index === -1) return [...current, message];
@@ -915,7 +922,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   isEdited(message: Message): boolean {
-    return !message.deletedAt && Date.parse(message.updatedAt) > Date.parse(message.createdAt) + 1000;
+    return !message.deletedAt && message.updatedAt !== message.createdAt;
   }
 
   requestMessageDelete(message: Message): void {
