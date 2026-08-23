@@ -1,5 +1,6 @@
-<button type="button" class="invitations-trigger" (click)="open()">
-  <span>Invitations</span>
+<button type="button" class="invitations-trigger" [class.compact]="compact()"
+  title="Pending invitations" aria-label="Pending workspace invitations" (click)="open()">
+  <span aria-hidden="true">{{ compact() ? '✉' : 'Invitations' }}</span>
   @if (!isLoading() && invitations().length > 0) {
     <span class="invitation-count">{{ invitations().length }}</span>
   }

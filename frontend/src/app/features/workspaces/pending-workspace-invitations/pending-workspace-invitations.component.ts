@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, output, signal } from '@angular/core';
+import { Component, OnInit, input, output, signal } from '@angular/core';
 
 import { ApiErrorResponse } from '../../../core/auth/auth.models';
 import { WorkspaceInvitation } from '../workspace-invitation.models';
@@ -14,6 +14,7 @@ import { WorkspaceInvitationService } from '../workspace-invitation.service';
   styleUrl: './pending-workspace-invitations.component.css',
 })
 export class PendingWorkspaceInvitationsComponent implements OnInit {
+  readonly compact = input(false);
   readonly invitationAccepted = output<void>();
 
   readonly isOpen = signal(false);

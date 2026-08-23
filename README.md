@@ -418,43 +418,6 @@ Secrets must never be committed to GitHub.
 
 Hiding a button in Angular is not a security measure. Every sensitive action must also be validated and authorised by the Spring Boot backend.
 
-## Git Workflow
-
-The primary branch is:
-
-```text
-main
-```
-
-Larger features can use separate branches:
-
-```text
-feature/authentication
-feature/workspaces
-feature/channels
-feature/realtime-messaging
-```
-
-Example workflow:
-
-```powershell
-git checkout -b feature/authentication
-git add .
-git commit -m "Implement user registration"
-git push -u origin feature/authentication
-```
-
-Useful commit messages include:
-
-```text
-Configure PostgreSQL and Flyway
-Add user database migration
-Implement user registration
-Add JWT authentication
-Create workspace management
-Implement channel messaging
-Add WebSocket message delivery
-```
 
 ## Daily Development Workflow
 
