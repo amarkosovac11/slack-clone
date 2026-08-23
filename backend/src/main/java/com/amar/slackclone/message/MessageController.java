@@ -61,4 +61,10 @@ public class MessageController {
             Authentication authentication) {
         return messageService.updateMessage(workspaceId, channelId, messageId, request, authentication.getName());
     }
+
+    @DeleteMapping("/{messageId}")
+    public MessageResponse deleteMessage(@PathVariable Long workspaceId, @PathVariable Long channelId,
+            @PathVariable Long messageId, Authentication authentication) {
+        return messageService.deleteMessage(workspaceId, channelId, messageId, authentication.getName());
+    }
 }

@@ -49,7 +49,7 @@ public class MessageService {
         );
 
         return messageRepository
-            .findAllByChannelIdAndDeletedAtIsNullOrderByCreatedAtAsc(channelId)
+            .findAllByChannelIdOrderByCreatedAtAsc(channelId)
             .stream()
             .map(this::toMessageResponse)
             .toList();
@@ -89,6 +89,21 @@ public class MessageService {
         requireSender(message, user);
         requireNotDeleted(message);
         message.setContent(request.content().trim());
+        message.markUpdated();
+        MessageResponse response = toMessageResponse(message);
+        broadcastAfterCommit(workspaceId, channelId, response);
+        return response;
+    }
+
+    @Transactional
+    public MessageResponse deleteMessage(Long workspaceId, Long channelId, Long messageId,
+            String authenticatedEmail) {
+        User user = getAuthenticatedUser(authenticatedEmail);
+        channelAccessService.validateChannelAccess(workspaceId, channelId, authenticatedEmail);
+        Message message = requireMessage(channelId, messageId);
+        requireSender(message, user);
+        requireNotDeleted(message);
+        message.setDeletedAt(java.time.OffsetDateTime.now());
         message.markUpdated();
         MessageResponse response = toMessageResponse(message);
         broadcastAfterCommit(workspaceId, channelId, response);

@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    List<Message> findAllByChannelIdAndDeletedAtIsNullOrderByCreatedAtAsc(
+    List<Message> findAllByChannelIdOrderByCreatedAtAsc(
         Long channelId
     );
 
