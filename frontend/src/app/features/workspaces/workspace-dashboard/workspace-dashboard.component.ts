@@ -489,7 +489,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
             return;
           }
 
-          this.appendMessageIfAbsent(message);
+          this.upsertMessage(message);
           this.messageForm.reset({ content: '' });
           this.isSendingMessage.set(false);
         },
@@ -755,7 +755,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           this.selectedChannel()?.id === channelId &&
           message.channelId === channelId
         ) {
-          this.appendMessageIfAbsent(message);
+          this.upsertMessage(message);
         }
       },
     );
@@ -775,12 +775,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           return;
         }
 
-        const historyIds = new Set(messages.map((message) => message.id));
-        const messagesReceivedDuringLoad = this.messages().filter(
-          (message) => !historyIds.has(message.id)
-        );
-
-        this.messages.set([...messages, ...messagesReceivedDuringLoad]);
+        const merged = new Map(messages.map(message => [message.id, message]));
+        for (const liveMessage of this.messages()) {
+          const historyMessage = merged.get(liveMessage.id);
+          if (!historyMessage || Date.parse(liveMessage.updatedAt) > Date.parse(historyMessage.updatedAt)) {
+            merged.set(liveMessage.id, liveMessage);
+          }
+        }
+        this.messages.set([...merged.values()].sort(
+          (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)
+        ));
         this.messagesLoading.set(false);
       },
       error: (error: HttpErrorResponse) => {
@@ -860,11 +864,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/login']);
   }
 
-  private appendMessageIfAbsent(message: Message): void {
-    this.messages.update((current) =>
-      current.some((existing) => existing.id === message.id)
-        ? current
-        : [...current, message]
-    );
+  private upsertMessage(message: Message): void {
+    this.messages.update((current) => {
+      const index = current.findIndex(existing => existing.id === message.id);
+      if (index === -1) return [...current, message];
+      if (Date.parse(message.updatedAt) < Date.parse(current[index].updatedAt)) return current;
+      return current.map(existing => existing.id === message.id ? message : existing);
+    });
   }
 }
