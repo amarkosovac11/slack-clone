@@ -233,6 +233,8 @@ public class ChannelService {
             );
         }
 
+        requireActive(channel);
+
         User userToAdd = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new UserNotFoundException(userId)
@@ -315,6 +317,8 @@ public class ChannelService {
             );
         }
 
+        requireActive(channel);
+
         ChannelMember membership = channelMemberRepository
                 .findByChannelIdAndUserId(
                         channelId,
@@ -368,6 +372,8 @@ public class ChannelService {
                     "Members can only be managed for private channels"
             );
         }
+
+        requireActive(channel);
 
         return channelMemberRepository
                 .findAllByChannelId(channelId)
