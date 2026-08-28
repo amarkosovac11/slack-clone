@@ -110,6 +110,8 @@ public class ChannelController {
                         Authentication authentication) {
                 return channelService.archiveChannel(workspaceId, channelId, authentication.getName());
         }
+        @GetMapping("/archived") public List<ChannelResponse> archived(@PathVariable Long workspaceId,Authentication authentication){return channelService.getArchivedChannels(workspaceId,authentication.getName());}
+        @PostMapping("/{channelId}/unarchive") public ChannelResponse unarchive(@PathVariable Long workspaceId,@PathVariable Long channelId,Authentication authentication){return channelService.unarchiveChannel(workspaceId,channelId,authentication.getName());}
 
         @DeleteMapping("/{channelId}")
         @ResponseStatus(HttpStatus.NO_CONTENT)
