@@ -1,9 +1,11 @@
 package com.amar.slackclone.workspace;
 
 import com.amar.slackclone.channel.ChannelMemberRepository;
+import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
+import com.amar.slackclone.workspace.dto.UpdateWorkspaceRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -35,7 +37,8 @@ class WorkspaceServiceMemberManagementTests {
                 workspaceRepository,
                 memberRepository,
                 userRepository,
-                channelMemberRepository
+                channelMemberRepository,
+                new WorkspaceAccessService(workspaceRepository, memberRepository, userRepository)
         );
         actor = user(1L, "actor@example.com", "Actor");
         workspace = new Workspace("Team", "team", actor, Instant.now(), Instant.now());
@@ -86,7 +89,7 @@ class WorkspaceServiceMemberManagementTests {
                 membership(actor, actorRole),
                 membership(user(2L, "target@example.com", "Target"), WorkspaceRole.MEMBER)
         );
-        assertThrows(WorkspaceMemberAccessDeniedException.class, () -> service.updateWorkspaceMemberRole(
+        assertThrows(WorkspaceAccessDeniedException.class, () -> service.updateWorkspaceMemberRole(
                 10L, 2L, new UpdateWorkspaceMemberRoleRequest(WorkspaceRole.ADMIN), actor.getEmail()
         ));
     }
@@ -128,7 +131,7 @@ class WorkspaceServiceMemberManagementTests {
                 membership(actor, WorkspaceRole.MEMBER),
                 membership(user(2L, "target@example.com", "Target"), WorkspaceRole.MEMBER)
         );
-        assertThrows(WorkspaceMemberAccessDeniedException.class,
+        assertThrows(WorkspaceAccessDeniedException.class,
                 () -> service.removeWorkspaceMember(10L, 2L, actor.getEmail()));
     }
 
@@ -138,6 +141,46 @@ class WorkspaceServiceMemberManagementTests {
         stubMemberships(owner, owner);
         assertThrows(WorkspaceMemberConflictException.class,
                 () -> service.removeWorkspaceMember(10L, 1L, actor.getEmail()));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = WorkspaceRole.class, names = {"OWNER", "ADMIN"})
+    void ownerAndAdminCanEditWorkspace(WorkspaceRole actorRole) {
+        when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L))
+                .thenReturn(Optional.of(membership(actor, actorRole)));
+
+        var response = service.updateWorkspace(10L, new UpdateWorkspaceRequest("Renamed Team"), actor.getEmail());
+
+        assertEquals("Renamed Team", response.name());
+        assertEquals("Renamed Team", workspace.getName());
+    }
+
+    @Test
+    void memberCannotEditWorkspace() {
+        when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L))
+                .thenReturn(Optional.of(membership(actor, WorkspaceRole.MEMBER)));
+        assertThrows(WorkspaceAccessDeniedException.class,
+                () -> service.updateWorkspace(10L, new UpdateWorkspaceRequest("Renamed"), actor.getEmail()));
+    }
+
+    @Test
+    void onlyOwnerCanDeleteWorkspace() {
+        WorkspaceMember owner = membership(actor, WorkspaceRole.OWNER);
+        when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(owner));
+
+        service.deleteWorkspace(10L, actor.getEmail());
+
+        verify(workspaceRepository).delete(workspace);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = WorkspaceRole.class, names = {"ADMIN", "MEMBER"})
+    void adminAndMemberCannotDeleteWorkspace(WorkspaceRole actorRole) {
+        when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L))
+                .thenReturn(Optional.of(membership(actor, actorRole)));
+        assertThrows(WorkspaceAccessDeniedException.class,
+                () -> service.deleteWorkspace(10L, actor.getEmail()));
+        verify(workspaceRepository, never()).delete(workspace);
     }
 
     private void stubMemberships(WorkspaceMember actorMembership, WorkspaceMember targetMembership) {

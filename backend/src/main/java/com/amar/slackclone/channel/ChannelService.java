@@ -9,8 +9,7 @@ import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.Workspace;
 import com.amar.slackclone.workspace.WorkspaceMember;
 import com.amar.slackclone.workspace.WorkspaceMemberRepository;
-import com.amar.slackclone.workspace.WorkspaceRepository;
-import com.amar.slackclone.workspace.WorkspaceRole;
+import com.amar.slackclone.workspace.WorkspaceAccessService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,23 +22,23 @@ import java.time.OffsetDateTime;
 public class ChannelService {
 
     private final ChannelRepository channelRepository;
-    private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final ChannelMemberRepository channelMemberRepository;
+    private final WorkspaceAccessService workspaceAccessService;
 
     public ChannelService(
             ChannelRepository channelRepository,
-            WorkspaceRepository workspaceRepository,
             ChannelMemberRepository channelMemberRepository,
             WorkspaceMemberRepository workspaceMemberRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            WorkspaceAccessService workspaceAccessService
     ) {
         this.channelRepository = channelRepository;
-        this.workspaceRepository = workspaceRepository;
         this.channelMemberRepository = channelMemberRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
+        this.workspaceAccessService = workspaceAccessService;
     }
 
     @Transactional
@@ -49,29 +48,8 @@ public class ChannelService {
             String currentUserEmail
     ) {
         User currentUser = getCurrentUser(currentUserEmail);
-
-        Workspace workspace = workspaceRepository.findById(workspaceId)
-                .orElseThrow(() ->
-                        new WorkspaceNotFoundException(workspaceId)
-                );
-
-        WorkspaceMember membership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(
-                        workspaceId,
-                        currentUser.getId()
-                )
-                .orElseThrow(() ->
-                        new WorkspaceAccessDeniedException(
-                                "You are not a member of this workspace"
-                        )
-                );
-
-        if (membership.getRole() != WorkspaceRole.OWNER
-                && membership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can create channels"
-            );
-        }
+        WorkspaceMember membership = workspaceAccessService.requireOwnerOrAdmin(workspaceId, currentUserEmail);
+        Workspace workspace = membership.getWorkspace();
 
         String name = request.name().trim();
         String slug = generateUniqueSlug(workspaceId, name);
@@ -103,22 +81,7 @@ public class ChannelService {
             String currentUserEmail
     ) {
         User currentUser = getCurrentUser(currentUserEmail);
-
-        workspaceRepository.findById(workspaceId)
-                .orElseThrow(() ->
-                        new WorkspaceNotFoundException(workspaceId)
-                );
-
-        workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(
-                        workspaceId,
-                        currentUser.getId()
-                )
-                .orElseThrow(() ->
-                        new WorkspaceAccessDeniedException(
-                                "You are not a member of this workspace"
-                        )
-                );
+        workspaceAccessService.requireWorkspaceMember(workspaceId, currentUserEmail);
 
         return channelRepository
                 .findVisibleChannels(
@@ -165,16 +128,7 @@ public class ChannelService {
     }
 
     private WorkspaceMember requireManager(Long workspaceId, String email) {
-        User user = getCurrentUser(email);
-        workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
-        WorkspaceMember membership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(workspaceId, user.getId())
-                .orElseThrow(() -> new WorkspaceAccessDeniedException("You are not a member of this workspace"));
-        if (membership.getRole() != WorkspaceRole.OWNER && membership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException("Only workspace owners and admins can manage channels");
-        }
-        return membership;
+        return workspaceAccessService.requireOwnerOrAdmin(workspaceId, email);
     }
 
     private Channel requireChannel(Long workspaceId, Long channelId) {
@@ -193,30 +147,7 @@ public class ChannelService {
             Long userId,
             String currentUserEmail
     ) {
-        User currentUser = getCurrentUser(currentUserEmail);
-
-        workspaceRepository.findById(workspaceId)
-                .orElseThrow(() ->
-                        new WorkspaceNotFoundException(workspaceId)
-                );
-
-        WorkspaceMember currentMembership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(
-                        workspaceId,
-                        currentUser.getId()
-                )
-                .orElseThrow(() ->
-                        new WorkspaceAccessDeniedException(
-                                "You are not a member of this workspace"
-                        )
-                );
-
-        if (currentMembership.getRole() != WorkspaceRole.OWNER
-                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can manage channel members"
-            );
-        }
+        workspaceAccessService.requireOwnerOrAdmin(workspaceId, currentUserEmail);
 
         Channel channel = channelRepository
                 .findByIdAndWorkspaceId(
@@ -277,30 +208,7 @@ public class ChannelService {
             Long userId,
             String currentUserEmail
     ) {
-        User currentUser = getCurrentUser(currentUserEmail);
-
-        workspaceRepository.findById(workspaceId)
-                .orElseThrow(() ->
-                        new WorkspaceNotFoundException(workspaceId)
-                );
-
-        WorkspaceMember currentMembership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(
-                        workspaceId,
-                        currentUser.getId()
-                )
-                .orElseThrow(() ->
-                        new WorkspaceAccessDeniedException(
-                                "You are not a member of this workspace"
-                        )
-                );
-
-        if (currentMembership.getRole() != WorkspaceRole.OWNER
-                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can manage channel members"
-            );
-        }
+        workspaceAccessService.requireOwnerOrAdmin(workspaceId, currentUserEmail);
 
         Channel channel = channelRepository
                 .findByIdAndWorkspaceId(
@@ -345,27 +253,11 @@ public class ChannelService {
             Long channelId,
             String authenticatedEmail
     ) {
-        User currentUser = getCurrentUser(authenticatedEmail);
-
-        workspaceRepository.findById(workspaceId)
-                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
-
-        WorkspaceMember currentMembership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-                .orElseThrow(() -> new WorkspaceAccessDeniedException(
-                        "You are not a member of this workspace"
-                ));
+        workspaceAccessService.requireOwnerOrAdmin(workspaceId, authenticatedEmail);
 
         Channel channel = channelRepository
                 .findByIdAndWorkspaceId(channelId, workspaceId)
                 .orElseThrow(() -> new ChannelNotFoundException(channelId));
-
-        if (currentMembership.getRole() != WorkspaceRole.OWNER
-                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can manage channel members"
-            );
-        }
 
         if (!channel.isPrivateChannel()) {
             throw new ChannelMembershipConflictException(
