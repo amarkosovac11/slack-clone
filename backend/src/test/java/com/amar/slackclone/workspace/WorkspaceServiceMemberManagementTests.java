@@ -6,6 +6,7 @@ import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceRequest;
+import com.amar.slackclone.workspace.dto.TransferWorkspaceOwnershipRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -202,6 +203,7 @@ class WorkspaceServiceMemberManagementTests {
         assertThrows(WorkspaceMemberConflictException.class, () -> service.leaveWorkspace(10L, actor.getEmail()));
         verify(memberRepository, never()).delete(membership);
     }
+    @Test void ownershipTransferPromotesTargetAndDemotesOldOwner(){WorkspaceMember owner=membership(actor,WorkspaceRole.OWNER);User next=user(2L,"next@example.com","Next");WorkspaceMember target=membership(next,WorkspaceRole.MEMBER);stubMemberships(owner,target);when(workspaceRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(workspace));var response=service.transferOwnership(10L,new TransferWorkspaceOwnershipRequest(2L),actor.getEmail());assertEquals(WorkspaceRole.ADMIN,owner.getRole());assertEquals(WorkspaceRole.OWNER,target.getRole());assertEquals(next,workspace.getOwner());assertEquals(WorkspaceRole.ADMIN,response.currentUserRole());}
 
     private void stubMemberships(WorkspaceMember actorMembership, WorkspaceMember targetMembership) {
         when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(actorMembership));

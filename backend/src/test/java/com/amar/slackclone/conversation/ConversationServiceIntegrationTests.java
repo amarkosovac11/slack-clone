@@ -190,6 +190,8 @@ class ConversationServiceIntegrationTests {
         service.leave(group.id(), a.getEmail());
         assertTrue(service.list(a.getEmail()).isEmpty());
     }
+    @Test void hiddenRestoreReadReceiptAndCreatorTransferUseExistingState(){var direct=service.startDirect(new StartDirectConversationRequest(b.getId()),a.getEmail());var sent=service.send(direct.id(),new CreateConversationMessageRequest("hello"),a.getEmail());assertEquals(0,service.receipt(direct.id(),sent.id(),a.getEmail()).readCount());service.markRead(direct.id(),b.getEmail());assertEquals(1,service.receipt(direct.id(),sent.id(),a.getEmail()).readCount());service.hide(direct.id(),a.getEmail());assertEquals(direct.id(),service.hidden(a.getEmail()).getFirst().id());assertEquals(direct.id(),service.restore(direct.id(),a.getEmail()).id());
+      var group=service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(),c.getId())),a.getEmail());service.transferCreator(group.id(),new TransferConversationCreatorRequest(b.getId()),a.getEmail());service.leave(group.id(),a.getEmail());assertThrows(ConversationAccessDeniedException.class,()->service.transferCreator(group.id(),new TransferConversationCreatorRequest(c.getId()),a.getEmail()));service.removeParticipant(group.id(),c.getId(),b.getEmail());}
 
     private User saveUser(String email, String name) {
         return users.save(new User(email, "hash", name, Instant.now(), Instant.now()));
