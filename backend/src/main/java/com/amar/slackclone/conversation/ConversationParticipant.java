@@ -12,6 +12,7 @@ public class ConversationParticipant {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "user_id") private User user;
     @Column(name = "joined_at", nullable = false) private OffsetDateTime joinedAt;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "last_read_message_id") private ConversationMessage lastReadMessage;
+    @Column(name = "hidden_at") private OffsetDateTime hiddenAt;
     @PrePersist void create() { if (joinedAt == null) joinedAt = OffsetDateTime.now(); }
     public Conversation getConversation() { return conversation; }
     public void setConversation(Conversation conversation) { this.conversation = conversation; }
@@ -19,4 +20,6 @@ public class ConversationParticipant {
     public void setUser(User user) { this.user = user; }
     public ConversationMessage getLastReadMessage() { return lastReadMessage; }
     public void setLastReadMessage(ConversationMessage message) { lastReadMessage = message; }
+    public OffsetDateTime getHiddenAt() { return hiddenAt; }
+    public void setHiddenAt(OffsetDateTime hiddenAt) { this.hiddenAt = hiddenAt; }
 }
