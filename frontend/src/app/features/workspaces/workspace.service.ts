@@ -6,7 +6,8 @@ import {
   CreateWorkspaceRequest,
   WorkspaceMember,
   WorkspaceResponse,
-  UpdateWorkspaceMemberRoleRequest
+  UpdateWorkspaceMemberRoleRequest,
+  UpdateWorkspaceRequest,
 } from './workspace.models';
 
 @Injectable({ providedIn: 'root' })
@@ -21,6 +22,14 @@ export class WorkspaceService {
 
   createWorkspace(request: CreateWorkspaceRequest): Observable<WorkspaceResponse> {
     return this.http.post<WorkspaceResponse>(this.apiUrl, request);
+  }
+
+  updateWorkspace(workspaceId: number, request: UpdateWorkspaceRequest): Observable<WorkspaceResponse> {
+    return this.http.patch<WorkspaceResponse>(`${this.apiUrl}/${workspaceId}`, request);
+  }
+
+  deleteWorkspace(workspaceId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${workspaceId}`);
   }
 
   getWorkspaceMembers(workspaceId: number): Observable<WorkspaceMember[]> {

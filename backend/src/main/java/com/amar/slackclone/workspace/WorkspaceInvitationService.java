@@ -1,8 +1,6 @@
 package com.amar.slackclone.workspace;
 
 import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
-import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
-import com.amar.slackclone.channel.WorkspaceNotFoundException;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.dto.CreateWorkspaceInvitationRequest;
@@ -18,21 +16,21 @@ import java.util.List;
 @Service
 public class WorkspaceInvitationService {
 
-    private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceInvitationRepository workspaceInvitationRepository;
     private final UserRepository userRepository;
+    private final WorkspaceAccessService workspaceAccessService;
 
     public WorkspaceInvitationService(
-            WorkspaceRepository workspaceRepository,
             WorkspaceMemberRepository workspaceMemberRepository,
             WorkspaceInvitationRepository workspaceInvitationRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            WorkspaceAccessService workspaceAccessService
     ) {
-        this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.workspaceInvitationRepository = workspaceInvitationRepository;
         this.userRepository = userRepository;
+        this.workspaceAccessService = workspaceAccessService;
     }
 
     @Transactional
@@ -45,25 +43,8 @@ public class WorkspaceInvitationService {
                 .findByEmailIgnoreCase(authenticatedEmail)
                 .orElseThrow(AuthenticatedUserNotFoundException::new);
 
-        Workspace workspace = workspaceRepository
-                .findById(workspaceId)
-                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
-
-        WorkspaceMember currentMembership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(
-                        workspaceId,
-                        currentUser.getId()
-                )
-                .orElseThrow(() -> new WorkspaceAccessDeniedException(
-                        "You are not a member of this workspace"
-                ));
-
-        if (currentMembership.getRole() != WorkspaceRole.OWNER
-                && currentMembership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can invite members"
-            );
-        }
+        Workspace workspace = workspaceAccessService
+                .requireOwnerOrAdmin(workspaceId, authenticatedEmail).getWorkspace();
 
         if (request.role() == WorkspaceRole.OWNER) {
             throw new WorkspaceInvitationConflictException(
@@ -160,22 +141,7 @@ public class WorkspaceInvitationService {
     ) {
         User currentUser = getAuthenticatedUser(authenticatedEmail);
 
-        workspaceRepository
-                .findById(workspaceId)
-                .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
-
-        WorkspaceMember membership = workspaceMemberRepository
-                .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-                .orElseThrow(() -> new WorkspaceAccessDeniedException(
-                        "You are not a member of this workspace"
-                ));
-
-        if (membership.getRole() != WorkspaceRole.OWNER
-                && membership.getRole() != WorkspaceRole.ADMIN) {
-            throw new WorkspaceAccessDeniedException(
-                    "Only workspace owners and admins can view invitations"
-            );
-        }
+        workspaceAccessService.requireOwnerOrAdmin(workspaceId, authenticatedEmail);
 
         Instant now = Instant.now();
 

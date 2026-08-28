@@ -19,6 +19,7 @@ import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-
 import { WorkspaceMembersComponent } from '../workspace-members/workspace-members.component';
 import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
+import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-settings.component';
 
 @Component({
   selector: 'app-workspace-dashboard',
@@ -29,6 +30,7 @@ import { WorkspaceService } from '../workspace.service';
     PendingWorkspaceInvitationsComponent,
     WorkspaceInvitationManagementComponent,
     WorkspaceMembersComponent,
+    WorkspaceSettingsComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
   styleUrl: './workspace-dashboard.component.css',
@@ -63,6 +65,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   );
 
   readonly canManageSelectedWorkspaceInvitations = computed(() => {
+    const role = this.selectedWorkspaceRole();
+    return role === 'OWNER' || role === 'ADMIN';
+  });
+
+  readonly canEditSelectedWorkspace = computed(() => {
     const role = this.selectedWorkspaceRole();
     return role === 'OWNER' || role === 'ADMIN';
   });
@@ -349,6 +356,23 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   userInitial(): string {
     return this.currentUser()?.displayName.trim().charAt(0).toUpperCase() || 'U';
+  }
+
+  workspaceUpdated(updated: WorkspaceResponse): void {
+    this.workspaces.update(items => items.map(item => item.id === updated.id ? updated : item));
+  }
+
+  workspaceDeleted(workspaceId: number): void {
+    this.messageWebSocketService.unsubscribeFromChannel();
+    const remaining = this.workspaces().filter(workspace => workspace.id !== workspaceId);
+    this.workspaces.set(remaining);
+    this.selectedWorkspaceId.set(null);
+    this.selectedChannel.set(null);
+    this.channels.set([]);
+    this.messages.set([]);
+    void this.router.navigate(['/workspaces']).then(() => {
+      if (remaining.length > 0) this.loadWorkspaceChannels(remaining[0].id);
+    });
   }
 
   toggleProfilePlaceholder(): void {

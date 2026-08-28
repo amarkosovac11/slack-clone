@@ -1,16 +1,14 @@
 package com.amar.slackclone.workspace;
 
 import com.amar.slackclone.auth.InvalidCredentialsException;
-import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
 import com.amar.slackclone.channel.ChannelMemberRepository;
-import com.amar.slackclone.channel.WorkspaceAccessDeniedException;
-import com.amar.slackclone.channel.WorkspaceNotFoundException;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
 import com.amar.slackclone.workspace.dto.CreateWorkspaceRequest;
 import com.amar.slackclone.workspace.dto.WorkspaceResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
+import com.amar.slackclone.workspace.dto.UpdateWorkspaceRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,17 +25,35 @@ private final WorkspaceRepository workspaceRepository;
 private final WorkspaceMemberRepository workspaceMemberRepository;
 private final UserRepository userRepository;
 private final ChannelMemberRepository channelMemberRepository;
+private final WorkspaceAccessService workspaceAccessService;
 
 public WorkspaceService(
         WorkspaceRepository workspaceRepository,
         WorkspaceMemberRepository workspaceMemberRepository,
         UserRepository userRepository,
-        ChannelMemberRepository channelMemberRepository
+        ChannelMemberRepository channelMemberRepository,
+        WorkspaceAccessService workspaceAccessService
 ) {
     this.workspaceRepository = workspaceRepository;
     this.workspaceMemberRepository = workspaceMemberRepository;
     this.userRepository = userRepository;
     this.channelMemberRepository = channelMemberRepository;
+    this.workspaceAccessService = workspaceAccessService;
+}
+
+@Transactional
+public WorkspaceResponse updateWorkspace(Long workspaceId, UpdateWorkspaceRequest request, String authenticatedEmail) {
+    WorkspaceMember membership = workspaceAccessService.requireOwnerOrAdmin(workspaceId, authenticatedEmail);
+    Workspace workspace = membership.getWorkspace();
+    workspace.setName(request.name().trim());
+    workspace.setUpdatedAt(Instant.now());
+    return toWorkspaceResponse(membership);
+}
+
+@Transactional
+public void deleteWorkspace(Long workspaceId, String authenticatedEmail) {
+    WorkspaceMember owner = workspaceAccessService.requireOwner(workspaceId, authenticatedEmail);
+    workspaceRepository.delete(owner.getWorkspace());
 }
 
 @Transactional
@@ -97,18 +113,7 @@ public List<WorkspaceMemberResponse> getWorkspaceMembers(
         Long workspaceId,
         String authenticatedEmail
 ) {
-    User currentUser = userRepository
-            .findByEmailIgnoreCase(authenticatedEmail)
-            .orElseThrow(AuthenticatedUserNotFoundException::new);
-
-    workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
-
-    workspaceMemberRepository
-            .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-            .orElseThrow(() -> new WorkspaceAccessDeniedException(
-                    "You are not a member of this workspace"
-            ));
+    workspaceAccessService.requireWorkspaceMember(workspaceId, authenticatedEmail);
 
     return workspaceMemberRepository
             .findAllByWorkspaceId(workspaceId)
@@ -124,13 +129,7 @@ public WorkspaceMemberResponse updateWorkspaceMemberRole(
         UpdateWorkspaceMemberRoleRequest request,
         String authenticatedEmail
 ) {
-    WorkspaceMember actor = getActorMembership(workspaceId, authenticatedEmail);
-
-    if (actor.getRole() != WorkspaceRole.OWNER) {
-        throw new WorkspaceMemberAccessDeniedException(
-                "Only the workspace owner can change member roles"
-        );
-    }
+    WorkspaceMember actor = workspaceAccessService.requireOwner(workspaceId, authenticatedEmail);
 
     WorkspaceMember target = getTargetMembership(workspaceId, targetUserId);
 
@@ -156,7 +155,7 @@ public void removeWorkspaceMember(
         Long targetUserId,
         String authenticatedEmail
 ) {
-    WorkspaceMember actor = getActorMembership(workspaceId, authenticatedEmail);
+    WorkspaceMember actor = workspaceAccessService.requireOwnerOrAdmin(workspaceId, authenticatedEmail);
     WorkspaceMember target = getTargetMembership(workspaceId, targetUserId);
 
     if (actor.getUser().getId().equals(targetUserId)) {
@@ -186,24 +185,6 @@ public void removeWorkspaceMember(
             targetUserId
     );
     workspaceMemberRepository.delete(target);
-}
-
-private WorkspaceMember getActorMembership(
-        Long workspaceId,
-        String authenticatedEmail
-) {
-    User currentUser = userRepository
-            .findByEmailIgnoreCase(authenticatedEmail)
-            .orElseThrow(AuthenticatedUserNotFoundException::new);
-
-    workspaceRepository.findById(workspaceId)
-            .orElseThrow(() -> new WorkspaceNotFoundException(workspaceId));
-
-    return workspaceMemberRepository
-            .findByWorkspaceIdAndUserId(workspaceId, currentUser.getId())
-            .orElseThrow(() -> new WorkspaceMemberAccessDeniedException(
-                    "You are not a member of this workspace"
-            ));
 }
 
 private WorkspaceMember getTargetMembership(Long workspaceId, Long userId) {

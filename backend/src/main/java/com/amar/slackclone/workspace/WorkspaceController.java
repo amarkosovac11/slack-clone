@@ -6,6 +6,7 @@ import com.amar.slackclone.workspace.dto.WorkspaceInvitationResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
+import com.amar.slackclone.workspace.dto.UpdateWorkspaceRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -91,6 +92,18 @@ public class WorkspaceController {
                 workspaceId,
                 authentication.getName()
         );
+    }
+
+    @PatchMapping("/{workspaceId}")
+    public WorkspaceResponse updateWorkspace(@PathVariable Long workspaceId,
+            @Valid @RequestBody UpdateWorkspaceRequest request, Authentication authentication) {
+        return workspaceService.updateWorkspace(workspaceId, request, authentication.getName());
+    }
+
+    @DeleteMapping("/{workspaceId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteWorkspace(@PathVariable Long workspaceId, Authentication authentication) {
+        workspaceService.deleteWorkspace(workspaceId, authentication.getName());
     }
 
     @PatchMapping("/{workspaceId}/members/{userId}/role")
