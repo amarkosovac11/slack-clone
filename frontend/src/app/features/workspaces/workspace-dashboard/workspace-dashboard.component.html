@@ -131,6 +131,14 @@
     <div class="channel-divider"></div>
 
     <div class="workspace-actions">
+    @if (canEditSelectedWorkspace()) {
+      <app-workspace-settings
+        [workspace]="selectedWorkspace()!"
+        [currentUserId]="currentUser()!.id"
+        (workspaceUpdated)="workspaceUpdated($event)"
+        (workspaceDeleted)="workspaceDeleted($event)"
+      />
+    }
       <app-workspace-members
         [workspaceId]="selectedWorkspace()!.id"
         [workspaceName]="selectedWorkspace()!.name"
