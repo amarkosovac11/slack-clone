@@ -1,15 +1,15 @@
 import { Injectable, signal } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { TokenService } from '../../core/auth/token.service';
-import { Conversation, ConversationMessage } from './conversation.models';
+import { ConversationListEvent, ConversationMessageEvent } from './conversation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConversationWebSocketService {
   private readonly client: Client;
   private messageSubscription: StompSubscription | null = null;
   private updatesSubscription: StompSubscription | null = null;
-  private desiredUpdate: { userId: number; callback: (conversation: Conversation) => void } | null = null;
-  private desiredConversation: { id: number; callback: (message: ConversationMessage) => void } | null = null;
+  private desiredUpdate: { userId: number; callback: (event: ConversationListEvent) => void } | null = null;
+  private desiredConversation: { id: number; callback: (event: ConversationMessageEvent) => void } | null = null;
   readonly connected = signal(false);
   constructor(tokenService: TokenService) {
     this.client = new Client({ brokerURL: 'ws://localhost:8080/ws', reconnectDelay: 5000,
@@ -19,11 +19,11 @@ export class ConversationWebSocketService {
       onStompError: () => this.connected.set(false) });
   }
   connect(): void { if (!this.client.active) this.client.activate(); }
-  subscribeToUpdates(userId: number, callback: (conversation: Conversation) => void): void {
+  subscribeToUpdates(userId: number, callback: (event: ConversationListEvent) => void): void {
     this.updatesSubscription?.unsubscribe(); this.desiredUpdate = { userId, callback };
     this.connect(); this.activateUpdateSubscription();
   }
-  subscribeToConversation(id: number, callback: (message: ConversationMessage) => void): void {
+  subscribeToConversation(id: number, callback: (event: ConversationMessageEvent) => void): void {
     this.unsubscribeConversation();
     this.desiredConversation = { id, callback }; this.connect(); this.activateMessageSubscription();
   }
@@ -34,7 +34,7 @@ export class ConversationWebSocketService {
   unsubscribeConversation(): void { this.messageSubscription?.unsubscribe(); this.messageSubscription = null; this.desiredConversation = null; }
   disconnect(): void { this.unsubscribeConversation(); this.updatesSubscription?.unsubscribe(); this.updatesSubscription = null; this.desiredUpdate = null; if (this.client.active) void this.client.deactivate(); }
   private activateUpdateSubscription(): void { if (!this.client.connected || !this.desiredUpdate || this.updatesSubscription) return;
-    const desired = this.desiredUpdate; this.updatesSubscription = this.client.subscribe(`/topic/users/${desired.userId}/conversations`, frame => desired.callback(JSON.parse(frame.body) as Conversation)); }
+    const desired = this.desiredUpdate; this.updatesSubscription = this.client.subscribe(`/topic/users/${desired.userId}/conversations`, frame => desired.callback(JSON.parse(frame.body) as ConversationListEvent)); }
   private activateMessageSubscription(): void { if (!this.client.connected || !this.desiredConversation || this.messageSubscription) return;
-    const desired = this.desiredConversation; this.messageSubscription = this.client.subscribe(`/topic/conversations/${desired.id}/messages`, frame => desired.callback(JSON.parse(frame.body) as ConversationMessage)); }
+    const desired = this.desiredConversation; this.messageSubscription = this.client.subscribe(`/topic/conversations/${desired.id}/messages`, frame => desired.callback(JSON.parse(frame.body) as ConversationMessageEvent)); }
 }
