@@ -84,6 +84,60 @@ class ConversationServiceIntegrationTests {
         assertEquals(0, service.markRead(direct.id(), b.getEmail()).unreadCount());
     }
 
+    @Test
+    void groupRenameCanBeSetAndClearedWhileDirectRenameAndOutsidersAreDenied() {
+        var group = service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(), c.getId())), a.getEmail());
+        assertEquals("Backend Team", service.rename(group.id(), new UpdateConversationRequest(" Backend Team "), b.getEmail()).displayName());
+        assertNull(service.rename(group.id(), new UpdateConversationRequest("  "), a.getEmail()).customName());
+        assertThrows(ConversationAccessDeniedException.class,
+                () -> service.rename(group.id(), new UpdateConversationRequest("Hack"), outsider.getEmail()));
+        var direct = service.startDirect(new StartDirectConversationRequest(b.getId()), a.getEmail());
+        assertThrows(ConversationValidationException.class,
+                () -> service.rename(direct.id(), new UpdateConversationRequest("Wrong"), a.getEmail()));
+    }
+
+    @Test
+    void senderCanEditAndSoftDeleteWithoutChangingUnreadCursorSemantics() {
+        var direct = service.startDirect(new StartDirectConversationRequest(b.getId()), a.getEmail());
+        var created = service.send(direct.id(), new CreateConversationMessageRequest("hello bro"), a.getEmail());
+        var edited = service.editMessage(direct.id(), created.id(), new UpdateConversationMessageRequest("hello"), a.getEmail());
+        assertEquals(created.createdAt(), edited.createdAt());
+        assertTrue(edited.updatedAt().isAfter(edited.createdAt()) || edited.updatedAt().isEqual(edited.createdAt()));
+        assertEquals(1, service.get(direct.id(), b.getEmail()).unreadCount());
+        assertThrows(ConversationAccessDeniedException.class,
+                () -> service.editMessage(direct.id(), created.id(), new UpdateConversationMessageRequest("hack"), b.getEmail()));
+        assertThrows(ConversationAccessDeniedException.class,
+                () -> service.editMessage(direct.id(), created.id(), new UpdateConversationMessageRequest("hack"), outsider.getEmail()));
+        assertThrows(ConversationAccessDeniedException.class,
+                () -> service.deleteMessage(direct.id(), created.id(), b.getEmail()));
+        assertThrows(ConversationAccessDeniedException.class,
+                () -> service.deleteMessage(direct.id(), created.id(), outsider.getEmail()));
+        assertThrows(ConversationValidationException.class,
+                () -> service.editMessage(direct.id(), created.id(), new UpdateConversationMessageRequest("  "), a.getEmail()));
+        var deleted = service.deleteMessage(direct.id(), created.id(), a.getEmail());
+        assertNull(deleted.content()); assertNotNull(deleted.deletedAt());
+        assertEquals(0, service.get(direct.id(), b.getEmail()).unreadCount());
+        assertNotNull(service.history(direct.id(), null, 50, b.getEmail()).messages().getFirst().deletedAt());
+
+        var group = service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(), c.getId())), a.getEmail());
+        var groupMessage = service.send(group.id(), new CreateConversationMessageRequest("group draft"), a.getEmail());
+        assertEquals("group final", service.editMessage(group.id(), groupMessage.id(),
+                new UpdateConversationMessageRequest("group final"), a.getEmail()).content());
+    }
+
+    @Test
+    void hidingIsPerParticipantAndStartingDirectOrReceivingMessageRestoresVisibility() {
+        var direct = service.startDirect(new StartDirectConversationRequest(b.getId()), a.getEmail());
+        service.hide(direct.id(), a.getEmail());
+        assertTrue(service.list(a.getEmail()).isEmpty());
+        assertEquals(direct.id(), service.list(b.getEmail()).getFirst().id());
+        assertEquals(direct.id(), service.startDirect(new StartDirectConversationRequest(b.getId()), a.getEmail()).id());
+        assertEquals(direct.id(), service.list(a.getEmail()).getFirst().id());
+        service.hide(direct.id(), a.getEmail());
+        service.send(direct.id(), new CreateConversationMessageRequest("welcome back"), b.getEmail());
+        assertEquals(direct.id(), service.list(a.getEmail()).getFirst().id());
+    }
+
     private User saveUser(String email, String name) {
         return users.save(new User(email, "hash", name, Instant.now(), Instant.now()));
     }
