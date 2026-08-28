@@ -19,19 +19,27 @@ class WebSocketConversationSecurityTests {
 
     @Test
     void participantSubscriptionAndSendAreCheckedServerSide() {
-        interceptor.preSend(frame(StompCommand.SUBSCRIBE, "/topic/conversations/12/messages", "user@example.com"), null);
+        mockUser("user@example.com", 7L);
+        interceptor.preSend(frame(StompCommand.SUBSCRIBE, "/topic/users/7/conversations/12/messages", "user@example.com"), null);
         interceptor.preSend(frame(StompCommand.SEND, "/app/conversations/12/messages", "user@example.com"), null);
         verify(access, times(2)).requireParticipant(12L, "user@example.com");
     }
 
     @Test
     void outsiderCannotSubscribeOrSend() {
+        mockUser("outsider@example.com", 8L);
         when(access.requireParticipant(12L, "outsider@example.com"))
                 .thenThrow(new ConversationAccessDeniedException("denied"));
         assertThrows(ConversationAccessDeniedException.class, () -> interceptor.preSend(
-                frame(StompCommand.SUBSCRIBE, "/topic/conversations/12/messages", "outsider@example.com"), null));
+                frame(StompCommand.SUBSCRIBE, "/topic/users/8/conversations/12/messages", "outsider@example.com"), null));
         assertThrows(ConversationAccessDeniedException.class, () -> interceptor.preSend(
                 frame(StompCommand.SEND, "/app/conversations/12/messages", "outsider@example.com"), null));
+    }
+
+    private void mockUser(String email, Long id) {
+        User user = new User(email, "hash", "User", Instant.now(), Instant.now());
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", id);
+        when(access.requireUser(email)).thenReturn(user);
     }
 
     @Test
