@@ -1,6 +1,7 @@
 package com.amar.slackclone.message.dto;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 public record MessageResponse(
 
@@ -15,7 +16,9 @@ public record MessageResponse(
 
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
-    OffsetDateTime deletedAt
+    OffsetDateTime deletedAt,
+    List<MentionResponse> mentions,
+    boolean pinned
 
 ) {
 }
