@@ -65,6 +65,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly eligibleUsers = signal<ConversationUser[]>([]);
   readonly selectedConversationUserIds = signal<number[]>([]);
   readonly conversationModalLoading = signal(false);
+  readonly showConversationMenu = signal(false);
+  readonly showRenameConversationModal = signal(false);
+  readonly confirmingConversationHide = signal(false);
+  readonly conversationActionLoading = signal(false);
+  readonly editingConversationMessageId = signal<number | null>(null);
+  readonly conversationMessagePendingDelete = signal<ConversationMessage | null>(null);
 
   readonly selectedWorkspace = computed(() => {
     const workspaceId = this.selectedWorkspaceId();
@@ -182,6 +188,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly conversationMessageForm = this.formBuilder.nonNullable.group({
     content: ['', [Validators.required, Validators.maxLength(4000)]],
   });
+  readonly renameConversationForm = this.formBuilder.nonNullable.group({ name: ['', [Validators.maxLength(100)]] });
+  readonly editConversationMessageForm = this.formBuilder.nonNullable.group({ content: ['', [Validators.required, Validators.maxLength(4000)]] });
   readonly editMessageForm = this.formBuilder.nonNullable.group({
     content: ['', [Validators.required, Validators.maxLength(4000)]],
   });
@@ -400,6 +408,18 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  workspaceLeft(workspaceId: number): void {
+    const keepConversation = this.selectedConversation() !== null;
+    this.messageWebSocketService.unsubscribeFromChannel();
+    const remaining = this.workspaces().filter(workspace => workspace.id !== workspaceId);
+    this.workspaces.set(remaining); this.channels.set([]); this.messages.set([]); this.selectedChannel.set(null);
+    this.selectedWorkspaceId.set(remaining[0]?.id ?? null);
+    if (keepConversation) return;
+    void this.router.navigate(['/workspaces']).then(() => {
+      if (remaining.length > 0) this.loadWorkspaceChannels(remaining[0].id);
+    });
+  }
+
   toggleProfilePlaceholder(): void {
     this.showProfilePlaceholder.update((visible) => !visible);
   }
@@ -512,9 +532,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.conversationService.get(id).subscribe({
       next: conversation => {
         this.selectedConversation.set(conversation); this.upsertConversation(conversation);
-        this.conversationWebSocketService.subscribeToConversation(id, message => {
+        this.conversationWebSocketService.subscribeToConversation(id, event => {
           if (this.selectedConversation()?.id === id) {
-            this.upsertConversationMessage(message); this.markConversationRead(id);
+            this.upsertConversationMessage(event.message);
+            if (event.type === 'CREATED') this.markConversationRead(id);
           }
         });
         this.loadConversationHistory(id);
@@ -571,6 +592,56 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  toggleConversationMenu(): void { this.showConversationMenu.update(open => !open); }
+  openRenameConversation(): void {
+    const conversation = this.selectedConversation(); if (!conversation || conversation.type !== 'GROUP') return;
+    this.renameConversationForm.reset({ name: conversation.customName ?? '' });
+    this.showConversationMenu.set(false); this.showRenameConversationModal.set(true); this.conversationError.set(null);
+  }
+  saveConversationName(): void {
+    const conversation = this.selectedConversation(); if (!conversation || this.renameConversationForm.invalid) return;
+    this.conversationActionLoading.set(true);
+    const name = this.renameConversationForm.getRawValue().name.trim() || null;
+    this.conversationService.rename(conversation.id, name).subscribe({
+      next: updated => { this.upsertConversation(updated); this.showRenameConversationModal.set(false); this.conversationActionLoading.set(false); },
+      error: error => this.handleConversationActionError(error, 'Could not rename group.'),
+    });
+  }
+  requestHideConversation(): void { this.showConversationMenu.set(false); this.confirmingConversationHide.set(true); }
+  confirmHideConversation(): void {
+    const conversation = this.selectedConversation(); if (!conversation) return;
+    this.conversationActionLoading.set(true);
+    this.conversationService.hide(conversation.id).subscribe({
+      next: () => this.removeConversationFromUi(conversation.id),
+      error: error => this.handleConversationActionError(error, 'Could not remove conversation.'),
+    });
+  }
+  startEditingConversationMessage(message: ConversationMessage): void {
+    if (message.senderId !== this.currentUser()?.id || message.deletedAt) return;
+    this.editingConversationMessageId.set(message.id);
+    this.editConversationMessageForm.reset({ content: message.content ?? '' }); this.conversationError.set(null);
+  }
+  cancelEditingConversationMessage(): void { if (!this.conversationActionLoading()) this.editingConversationMessageId.set(null); }
+  saveConversationMessageEdit(message: ConversationMessage): void {
+    const conversation = this.selectedConversation();
+    if (!conversation || this.editConversationMessageForm.invalid || this.editingConversationMessageId() !== message.id) return;
+    const content = this.editConversationMessageForm.getRawValue().content.trim(); if (!content) return;
+    this.conversationActionLoading.set(true);
+    this.conversationService.editMessage(conversation.id, message.id, content).subscribe({
+      next: updated => { this.upsertConversationMessage(updated); this.editingConversationMessageId.set(null); this.conversationActionLoading.set(false); },
+      error: error => this.handleConversationActionError(error, 'Could not edit message.'),
+    });
+  }
+  confirmConversationMessageDelete(): void {
+    const conversation = this.selectedConversation(); const message = this.conversationMessagePendingDelete();
+    if (!conversation || !message) return;
+    this.conversationActionLoading.set(true);
+    this.conversationService.deleteMessage(conversation.id, message.id).subscribe({
+      next: deleted => { this.upsertConversationMessage(deleted); this.conversationMessagePendingDelete.set(null); this.conversationActionLoading.set(false); },
+      error: error => this.handleConversationActionError(error, 'Could not delete message.'),
+    });
+  }
+
   private loadConversationHistory(id: number, before?: number): void {
     this.conversationLoading.set(true);
     this.conversationService.history(id, before).subscribe({
@@ -588,9 +659,13 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   private closeConversationSelection(): void {
     this.conversationWebSocketService.unsubscribeConversation(); this.selectedConversation.set(null);
     this.conversationMessages.set([]); this.conversationCursor.set(null);
+    this.showConversationMenu.set(false); this.editingConversationMessageId.set(null); this.conversationMessagePendingDelete.set(null);
   }
   private upsertConversationMessage(message: ConversationMessage): void {
-    this.conversationMessages.update(items => items.some(item => item.id === message.id) ? items : [...items, message].sort((a, b) => a.id - b.id));
+    this.conversationMessages.update(items => items.some(item => item.id === message.id)
+      ? items.map(item => item.id === message.id ? message : item)
+      : [...items, message].sort((a, b) => a.id - b.id));
+    if (message.deletedAt && this.editingConversationMessageId() === message.id) this.editingConversationMessageId.set(null);
   }
   private upsertConversation(conversation: Conversation): void {
     this.conversations.update(items => [conversation, ...items.filter(item => item.id !== conversation.id)]
@@ -601,11 +676,24 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.conversationService.markRead(id).subscribe({ next: conversation => this.upsertConversation({ ...conversation, unreadCount: 0 }) });
   }
   private subscribeToConversationUpdates(userId: number): void {
-    this.conversationWebSocketService.subscribeToUpdates(userId, conversation => {
+    this.conversationWebSocketService.subscribeToUpdates(userId, event => {
+      if (event.type === 'REMOVED') { this.removeConversationFromUi(event.conversationId); return; }
+      const conversation = event.conversation;
       if (this.selectedConversation()?.id === conversation.id) {
         this.upsertConversation({ ...conversation, unreadCount: 0 }); this.markConversationRead(conversation.id);
       } else this.upsertConversation(conversation);
     });
+  }
+  private removeConversationFromUi(id: number): void {
+    this.conversations.update(items => items.filter(item => item.id !== id));
+    if (this.selectedConversation()?.id === id) {
+      this.closeConversationSelection(); this.confirmingConversationHide.set(false); this.conversationActionLoading.set(false);
+      void this.router.navigate(['/workspaces']);
+    }
+  }
+  private handleConversationActionError(error: HttpErrorResponse, fallback: string): void {
+    this.conversationError.set((error.error as ApiErrorResponse | undefined)?.message ?? fallback);
+    this.conversationActionLoading.set(false);
   }
 
   createChannel(): void {

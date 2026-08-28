@@ -19,4 +19,12 @@ export class ConversationService {
   }
   send(id: number, content: string): Observable<ConversationMessage> { return this.http.post<ConversationMessage>(`${this.url}/${id}/messages`, { content }); }
   markRead(id: number): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/${id}/read`, {}); }
+  rename(id: number, name: string | null): Observable<Conversation> { return this.http.patch<Conversation>(`${this.url}/${id}`, { name }); }
+  hide(id: number): Observable<void> { return this.http.delete<void>(`${this.url}/${id}`); }
+  editMessage(id: number, messageId: number, content: string): Observable<ConversationMessage> {
+    return this.http.patch<ConversationMessage>(`${this.url}/${id}/messages/${messageId}`, { content });
+  }
+  deleteMessage(id: number, messageId: number): Observable<ConversationMessage> {
+    return this.http.delete<ConversationMessage>(`${this.url}/${id}/messages/${messageId}`);
+  }
 }

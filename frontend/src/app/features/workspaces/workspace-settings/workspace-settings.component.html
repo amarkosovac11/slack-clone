@@ -7,6 +7,7 @@
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="workspace-settings-title" (click)="$event.stopPropagation()">
       <header><div><h2 id="workspace-settings-title">Workspace settings</h2><p>{{ workspace().name }}</p></div>
         <button type="button" aria-label="Close settings" [disabled]="isSaving()" (click)="close()">&times;</button></header>
+      @if (workspace().currentUserRole !== 'MEMBER') {
       <section class="settings-section"><h3>General</h3><p>Update the name shown to everyone in this workspace.</p>
         <form [formGroup]="form" (ngSubmit)="save()"><label for="settings-workspace-name">Workspace name</label>
           <input id="settings-workspace-name" formControlName="name" />
@@ -14,12 +15,21 @@
           <button type="submit" [disabled]="isSaving()">{{ isSaving() ? 'Saving...' : 'Save changes' }}</button>
         </form>
       </section>
+      }
       <section class="settings-section"><h3>Members</h3><p>Review roles and manage access using the permissions assigned to you.</p>
         <app-workspace-members [workspaceId]="workspace().id" [workspaceName]="workspace().name"
           [currentUserRole]="workspace().currentUserRole" [currentUserId]="currentUserId()" />
       </section>
       @if (errorMessage()) { <div class="settings-error">{{ errorMessage() }}</div> }
       @if (successMessage()) { <div class="settings-success">{{ successMessage() }}</div> }
+      @if (workspace().currentUserRole !== 'OWNER') {
+        <section class="danger-zone leave-zone"><h3>Leave workspace</h3><p>You will lose access to its channels and may need a new invitation to rejoin.</p>
+          @if (!confirmingLeave()) { <button type="button" class="leave-button" (click)="confirmingLeave.set(true)">Leave workspace</button> }
+          @else { <div class="confirmation"><strong>Leave “{{ workspace().name }}”?</strong><p>Your historical messages will remain visible to workspace members.</p>
+            <button type="button" [disabled]="isSaving()" (click)="confirmingLeave.set(false)">Cancel</button>
+            <button type="button" class="leave-button" [disabled]="isSaving()" (click)="leaveWorkspace()">{{ isSaving() ? 'Leaving...' : 'Yes, leave workspace' }}</button></div> }
+        </section>
+      }
       @if (workspace().currentUserRole === 'OWNER') {
         <section class="danger-zone"><h3>Danger zone</h3><p>Deleting a workspace permanently removes its channels, messages, memberships, and invitations.</p>
           @if (!confirmingDelete()) { <button type="button" class="delete-button" (click)="confirmingDelete.set(true)">Delete workspace</button> }

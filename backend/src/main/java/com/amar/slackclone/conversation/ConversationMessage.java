@@ -12,7 +12,9 @@ public class ConversationMessage {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "sender_id") private User sender;
     @Column(nullable = false, columnDefinition = "TEXT") private String content;
     @Column(name = "created_at", nullable = false) private OffsetDateTime createdAt;
-    @PrePersist void create() { if (createdAt == null) createdAt = OffsetDateTime.now(); }
+    @Column(name = "updated_at", nullable = false) private OffsetDateTime updatedAt;
+    @Column(name = "deleted_at") private OffsetDateTime deletedAt;
+    @PrePersist void create() { var now = OffsetDateTime.now(); if (createdAt == null) createdAt = now; if (updatedAt == null) updatedAt = now; }
     public Long getId() { return id; }
     public Conversation getConversation() { return conversation; }
     public void setConversation(Conversation conversation) { this.conversation = conversation; }
@@ -21,4 +23,8 @@ public class ConversationMessage {
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
+    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public OffsetDateTime getDeletedAt() { return deletedAt; }
+    public void edit(String content) { this.content = content; this.updatedAt = OffsetDateTime.now(); }
+    public void softDelete() { this.content = null; this.deletedAt = OffsetDateTime.now(); this.updatedAt = this.deletedAt; }
 }

@@ -37,4 +37,19 @@ public class ConversationController {
     @PostMapping("/{id}/read") public ConversationResponse read(@PathVariable Long id, Authentication auth) {
         return service.markRead(id, auth.getName());
     }
+    @PatchMapping("/{id}") public ConversationResponse rename(@PathVariable Long id,
+            @Valid @RequestBody UpdateConversationRequest request, Authentication auth) {
+        return service.rename(id, request, auth.getName());
+    }
+    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void hide(@PathVariable Long id, Authentication auth) { service.hide(id, auth.getName()); }
+    @PatchMapping("/{id}/messages/{messageId}")
+    public ConversationMessageResponse editMessage(@PathVariable Long id, @PathVariable Long messageId,
+            @Valid @RequestBody UpdateConversationMessageRequest request, Authentication auth) {
+        return service.editMessage(id, messageId, request, auth.getName());
+    }
+    @DeleteMapping("/{id}/messages/{messageId}")
+    public ConversationMessageResponse deleteMessage(@PathVariable Long id, @PathVariable Long messageId, Authentication auth) {
+        return service.deleteMessage(id, messageId, auth.getName());
+    }
 }

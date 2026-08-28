@@ -80,7 +80,7 @@
   </div>
 }
 
-@if (selectedWorkspaceId()) {
+@if (selectedWorkspaceId() || selectedConversation()) {
 
 <section class="workspace-view">
 
@@ -117,6 +117,8 @@
 
   <aside class="channel-sidebar">
 
+    @if (selectedWorkspace()) {
+
     <div class="channel-sidebar-header">
       <div>
         <h2>{{ selectedWorkspace()!.name }}</h2>
@@ -131,14 +133,13 @@
     <div class="channel-divider"></div>
 
     <div class="workspace-actions">
-    @if (canEditSelectedWorkspace()) {
       <app-workspace-settings
         [workspace]="selectedWorkspace()!"
         [currentUserId]="currentUser()!.id"
         (workspaceUpdated)="workspaceUpdated($event)"
         (workspaceDeleted)="workspaceDeleted($event)"
+        (workspaceLeft)="workspaceLeft($event)"
       />
-    }
       <app-workspace-members
         [workspaceId]="selectedWorkspace()!.id"
         [workspaceName]="selectedWorkspace()!.name"
@@ -210,6 +211,7 @@
     }
 
     <div class="channel-divider"></div>
+    }
     <div class="dm-heading">
       <span>Direct messages</span>
       <button type="button" title="Start a new message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()">+</button>
@@ -242,6 +244,15 @@
             <p>{{ conversation.type === 'DIRECT' ? 'Direct message' : conversation.participants.length + ' participants' }}</p>
           </div>
         </div>
+        <div class="conversation-menu-wrap">
+          <button type="button" class="conversation-menu-button" aria-label="Conversation settings" (click)="toggleConversationMenu()">&#8942;</button>
+          @if (showConversationMenu()) {
+            <div class="conversation-menu">
+              @if (conversation.type === 'GROUP') { <button type="button" (click)="openRenameConversation()">Rename group</button> }
+              <button type="button" class="destructive-menu-item" (click)="requestHideConversation()">Remove from sidebar</button>
+            </div>
+          }
+        </div>
       </header>
       <div class="message-area">
         @if (conversationCursor() !== null) { <button type="button" class="load-older-button" [disabled]="conversationLoading()" (click)="loadOlderConversationMessages()">Load older messages</button> }
@@ -251,7 +262,18 @@
           @for (message of conversationMessages(); track message.id) {
             <article class="message-row"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
               <div class="message-meta"><span class="message-sender">{{ message.senderDisplayName }}</span><time class="message-time" [attr.datetime]="message.createdAt">{{ message.createdAt | date:'shortTime' }}</time></div>
-              <p class="message-text">{{ message.content }}</p></div></article>
+              @if (message.deletedAt) { <p class="message-text deleted-message">Message deleted</p> }
+              @else if (editingConversationMessageId() === message.id) {
+                <form class="inline-edit-form" [formGroup]="editConversationMessageForm" (ngSubmit)="saveConversationMessageEdit(message)">
+                  <textarea formControlName="content" rows="3" aria-label="Edit direct message"></textarea>
+                  <div class="inline-edit-actions"><button type="button" [disabled]="conversationActionLoading()" (click)="cancelEditingConversationMessage()">Cancel</button><button type="submit" [disabled]="conversationActionLoading()">Save</button></div>
+                </form>
+              } @else { <p class="message-text">{{ message.content }} @if (message.updatedAt !== message.createdAt) { <small class="edited-label">(edited)</small> }</p> }
+              </div>
+              @if (!message.deletedAt && message.senderId === currentUser()?.id && editingConversationMessageId() !== message.id) {
+                <div class="message-actions"><button type="button" (click)="startEditingConversationMessage(message)">Edit</button><button type="button" class="message-delete-button" (click)="conversationMessagePendingDelete.set(message)">Delete</button></div>
+              }
+            </article>
           }
         </div>
       </div>
@@ -799,6 +821,36 @@
         <button type="button" class="primary-button" [disabled]="selectedConversationUserIds().length === 0 || conversationModalLoading()" (click)="createSelectedConversation()">
           {{ selectedConversationUserIds().length === 0 ? 'Select people' : selectedConversationUserIds().length === 1 ? 'Open message' : 'Create group' }}
         </button></div>
+    </section>
+  </div>
+}
+
+@if (showRenameConversationModal() && selectedConversation(); as conversation) {
+  <div class="modal-backdrop" role="presentation" (click)="showRenameConversationModal.set(false)">
+    <section class="message-delete-dialog conversation-action-dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <h2>Rename group</h2><p>Leave the name empty to use participant names automatically.</p>
+      <form [formGroup]="renameConversationForm" (ngSubmit)="saveConversationName()">
+        <input formControlName="name" maxlength="100" placeholder="Group name" />
+        <div class="modal-actions"><button type="button" class="secondary-button" [disabled]="conversationActionLoading()" (click)="showRenameConversationModal.set(false)">Cancel</button><button type="submit" class="primary-button" [disabled]="conversationActionLoading()">Save name</button></div>
+      </form>
+    </section>
+  </div>
+}
+
+@if (confirmingConversationHide() && selectedConversation(); as conversation) {
+  <div class="modal-backdrop" role="presentation" (click)="confirmingConversationHide.set(false)">
+    <section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <h2>Remove this conversation?</h2><p>History is not deleted for anyone. Starting or receiving a new message will make it appear again.</p>
+      <div class="modal-actions"><button type="button" class="secondary-button" [disabled]="conversationActionLoading()" (click)="confirmingConversationHide.set(false)">Cancel</button><button type="button" class="delete-channel-button" [disabled]="conversationActionLoading()" (click)="confirmHideConversation()">Remove</button></div>
+    </section>
+  </div>
+}
+
+@if (conversationMessagePendingDelete(); as message) {
+  <div class="modal-backdrop" role="presentation" (click)="conversationMessagePendingDelete.set(null)">
+    <section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+      <h2>Delete this message?</h2><p>Other participants will see “Message deleted”.</p>
+      <div class="modal-actions"><button type="button" class="secondary-button" [disabled]="conversationActionLoading()" (click)="conversationMessagePendingDelete.set(null)">Cancel</button><button type="button" class="delete-channel-button" [disabled]="conversationActionLoading()" (click)="confirmConversationMessageDelete()">Delete message</button></div>
     </section>
   </div>
 }

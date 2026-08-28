@@ -1,1 +1,21 @@
-.workspace-action{display:flex;align-items:center;gap:.55rem;width:100%;padding:.55rem .7rem;border:0;border-radius:6px;background:transparent;color:#ddd;text-align:left;cursor:pointer}.workspace-action:hover{background:#ffffff18}.settings-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:1rem;background:#0009}.settings-modal{width:min(620px,100%);max-height:90vh;overflow:auto;border-radius:10px;background:#fff;color:#1d1c1d;box-shadow:0 18px 60px #0005}.settings-modal>header{display:flex;justify-content:space-between;padding:1.25rem 1.5rem;border-bottom:1px solid #ddd}.settings-modal h2,.settings-modal h3,.settings-modal p{margin:.15rem 0}.settings-modal header button{border:0;background:transparent;font-size:1.8rem;cursor:pointer}.settings-section,.danger-zone{padding:1.25rem 1.5rem;border-bottom:1px solid #eee}.settings-section form{display:grid;gap:.65rem;margin-top:1rem}.settings-section input{padding:.7rem;border:1px solid #aaa;border-radius:5px}.settings-section form button{justify-self:start;padding:.65rem 1rem;border:0;border-radius:5px;background:#007a5a;color:#fff}.settings-section small,.settings-error{color:#b42318}.settings-error,.settings-success{margin:1rem 1.5rem;padding:.75rem;border-radius:5px;background:#fee}.settings-success{color:#067647;background:#ecfdf3}.danger-zone{margin:1rem;border:1px solid #e01e5a;border-radius:7px}.delete-button{padding:.65rem 1rem;border:0;border-radius:5px;background:#e01e5a;color:#fff;cursor:pointer}.confirmation button{margin:.75rem .5rem 0 0;padding:.6rem .85rem}
+.workspace-action { display: flex; align-items: center; gap: .55rem; width: 100%; padding: .55rem .7rem; border: 0; border-radius: 6px; background: transparent; color: #ddd; text-align: left; cursor: pointer; }
+.workspace-action:hover { background: #ffffff18; }
+.settings-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: #0009; }
+.settings-modal { width: min(620px, 100%); max-height: 90vh; overflow: auto; border-radius: 10px; background: #fff; color: #1d1c1d; box-shadow: 0 18px 60px #0005; }
+.settings-modal > header { display: flex; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #ddd; }
+.settings-modal h2, .settings-modal h3, .settings-modal p { margin: .15rem 0; }
+.settings-modal header button { border: 0; background: transparent; font-size: 1.8rem; cursor: pointer; }
+.settings-section, .danger-zone { padding: 1.25rem 1.5rem; border-bottom: 1px solid #eee; }
+.settings-section form { display: grid; gap: .65rem; margin-top: 1rem; }
+.settings-section input { padding: .7rem; border: 1px solid #aaa; border-radius: 5px; }
+.settings-section form button { justify-self: start; padding: .65rem 1rem; border: 0; border-radius: 5px; background: #007a5a; color: #fff; }
+.settings-section small, .settings-error { color: #b42318; }
+.settings-error, .settings-success { margin: 1rem 1.5rem; padding: .75rem; border-radius: 5px; background: #fee; }
+.settings-success { color: #067647; background: #ecfdf3; }
+.danger-zone { margin: 1rem; border: 1px solid #e01e5a; border-radius: 7px; }
+.delete-button, .leave-button { padding: .65rem 1rem; border-radius: 5px; font-weight: 700; cursor: pointer; }
+.delete-button { border: 0; background: #e01e5a; color: #fff; }
+.leave-zone { border-color: #f59e0b; }
+.leave-button { border: 1px solid #b45309; background: #fff; color: #92400e; }
+.leave-button:hover:not(:disabled) { background: #fffbeb; }
+.confirmation button { margin: .75rem .5rem 0 0; padding: .6rem .85rem; }

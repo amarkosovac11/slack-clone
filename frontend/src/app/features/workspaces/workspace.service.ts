@@ -32,6 +32,10 @@ export class WorkspaceService {
     return this.http.delete<void>(`${this.apiUrl}/${workspaceId}`);
   }
 
+  leaveWorkspace(workspaceId: number): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${workspaceId}/leave`, {});
+  }
+
   getWorkspaceMembers(workspaceId: number): Observable<WorkspaceMember[]> {
     return this.http.get<WorkspaceMember[]>(
       `${this.apiUrl}/${workspaceId}/members`

@@ -12,8 +12,9 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
     @EntityGraph(attributePaths = "sender")
     List<ConversationMessage> findByConversationIdOrderByIdDesc(Long conversationId, Pageable page);
     Optional<ConversationMessage> findTopByConversationIdOrderByIdDesc(Long conversationId);
+    Optional<ConversationMessage> findByIdAndConversationId(Long id, Long conversationId);
 
-    @Query("select count(m) from ConversationMessage m where m.conversation.id = :conversationId and m.id > :afterId and m.sender.id <> :userId")
+    @Query("select count(m) from ConversationMessage m where m.conversation.id = :conversationId and m.id > :afterId and m.sender.id <> :userId and m.deletedAt is null")
     long countUnread(@Param("conversationId") Long conversationId, @Param("afterId") Long afterId, @Param("userId") Long userId);
 
     @EntityGraph(attributePaths = "sender")
@@ -26,7 +27,7 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
     @Query("""
         select cp.conversation.id as conversationId, count(m.id) as unreadCount
         from ConversationParticipant cp left join ConversationMessage m
-          on m.conversation = cp.conversation and m.id > coalesce(cp.lastReadMessage.id, 0) and m.sender.id <> :userId
+          on m.conversation = cp.conversation and m.id > coalesce(cp.lastReadMessage.id, 0) and m.sender.id <> :userId and m.deletedAt is null
         where cp.user.id = :userId group by cp.conversation.id
         """)
     List<UnreadCount> findUnreadCounts(@Param("userId") Long userId);

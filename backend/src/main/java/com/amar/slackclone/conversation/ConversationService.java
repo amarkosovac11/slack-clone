@@ -41,8 +41,13 @@ public class ConversationService {
         if (insertedId.isPresent()) {
             addParticipant(conversation, creator); addParticipant(conversation, other);
             participants.flush();
+        } else {
+            participants.findByConversationIdAndUserId(conversation.getId(), creator.getId())
+                    .orElseThrow().setHiddenAt(null);
         }
-        return response(conversation, creator);
+        ConversationResponse result = response(conversation, creator);
+        broadcastListUpdatesAfterCommit(List.of(new UserConversationUpdate(creator.getId(), result)));
+        return result;
     }
 
     @Transactional
@@ -114,12 +119,64 @@ public class ConversationService {
         ConversationMessage message = new ConversationMessage(); message.setConversation(conversation);
         message.setSender(senderMembership.getUser()); message.setContent(request.content().trim());
         message = messages.saveAndFlush(message); senderMembership.setLastReadMessage(message); conversation.touch();
+        participants.findAllByConversationId(id).forEach(participant -> participant.setHiddenAt(null));
         ConversationMessageResponse result = messageResponse(message);
-        List<UserConversationUpdate> updates = participants.findUserIds(id).stream()
-                .map(users::findById).flatMap(Optional::stream)
-                .map(user -> new UserConversationUpdate(user.getId(), response(conversation, user))).toList();
-        broadcastAfterCommit(result, updates);
+        List<UserConversationUpdate> updates = conversationUpdates(conversation);
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.CREATED, result), updates);
         return result;
+    }
+
+    @Transactional
+    public ConversationResponse rename(Long id, UpdateConversationRequest request, String email) {
+        ConversationParticipant participant = access.requireParticipant(id, email);
+        Conversation conversation = participant.getConversation();
+        if (conversation.getType() != ConversationType.GROUP)
+            throw new ConversationValidationException("Direct conversations cannot be renamed");
+        String name = request.name() == null ? null : request.name().trim();
+        conversation.setCustomName(name == null || name.isEmpty() ? null : name);
+        ConversationResponse result = response(conversation, participant.getUser());
+        broadcastListUpdatesAfterCommit(conversationUpdates(conversation));
+        return result;
+    }
+
+    @Transactional
+    public ConversationMessageResponse editMessage(Long id, Long messageId,
+            UpdateConversationMessageRequest request, String email) {
+        ConversationParticipant participant = access.requireParticipant(id, email);
+        ConversationMessage message = requireMessage(id, messageId);
+        requireSender(message, participant.getUser());
+        if (message.getDeletedAt() != null) throw new ConversationValidationException("Deleted messages cannot be edited");
+        String content = request.content() == null ? "" : request.content().trim();
+        if (content.isEmpty()) throw new ConversationValidationException("Message content cannot be empty");
+        message.edit(content);
+        ConversationMessageResponse result = messageResponse(message);
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.UPDATED, result),
+                conversationUpdates(participant.getConversation()));
+        return result;
+    }
+
+    @Transactional
+    public ConversationMessageResponse deleteMessage(Long id, Long messageId, String email) {
+        ConversationParticipant participant = access.requireParticipant(id, email);
+        ConversationMessage message = requireMessage(id, messageId);
+        requireSender(message, participant.getUser());
+        if (message.getDeletedAt() != null) throw new ConversationValidationException("Message is already deleted");
+        message.softDelete();
+        ConversationMessageResponse result = messageResponse(message);
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.DELETED, result),
+                conversationUpdates(participant.getConversation()));
+        return result;
+    }
+
+    @Transactional
+    public void hide(Long id, String email) {
+        ConversationParticipant participant = access.requireParticipant(id, email);
+        participant.setHiddenAt(java.time.OffsetDateTime.now());
+        Long userId = participant.getUser().getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { broker.convertAndSend("/topic/users/" + userId + "/conversations",
+                    ConversationListEvent.removed(id)); }
+        });
     }
 
     @Transactional
@@ -129,7 +186,7 @@ public class ConversationService {
         ConversationResponse result = response(participant.getConversation(), participant.getUser());
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() { broker.convertAndSend(
-                    "/topic/users/" + participant.getUser().getId() + "/conversations", result); }
+                    "/topic/users/" + participant.getUser().getId() + "/conversations", ConversationListEvent.upsert(result)); }
         });
         return result;
     }
@@ -152,24 +209,48 @@ public class ConversationService {
     }
     private ConversationResponse response(Conversation conversation, User viewer, List<ConversationUserResponse> people,
             ConversationMessageResponse last, long unread) {
-        String name = people.stream().filter(p -> !p.id().equals(viewer.getId())).map(ConversationUserResponse::displayName)
+        String generatedName = people.stream().filter(p -> !p.id().equals(viewer.getId())).map(ConversationUserResponse::displayName)
                 .reduce((a, b) -> a + ", " + b).orElse("Direct message");
-        return new ConversationResponse(conversation.getId(), conversation.getType(), people, name, last, unread,
+        String name = conversation.getType() == ConversationType.GROUP && conversation.getCustomName() != null
+                ? conversation.getCustomName() : generatedName;
+        return new ConversationResponse(conversation.getId(), conversation.getType(), people, conversation.getCustomName(), name, last, unread,
                 conversation.getCreatedAt(), conversation.getUpdatedAt());
     }
     private ConversationUserResponse userResponse(User u) { return new ConversationUserResponse(u.getId(), u.getDisplayName(), u.getEmail()); }
     private ConversationMessageResponse messageResponse(ConversationMessage m) {
         return new ConversationMessageResponse(m.getId(), m.getConversation().getId(), m.getSender().getId(),
-                m.getSender().getDisplayName(), m.getContent(), m.getCreatedAt());
+                m.getSender().getDisplayName(), m.getContent(), m.getCreatedAt(), m.getUpdatedAt(), m.getDeletedAt());
+    }
+    private ConversationMessage requireMessage(Long conversationId, Long messageId) {
+        return messages.findByIdAndConversationId(messageId, conversationId)
+                .orElseThrow(() -> new ConversationNotFoundException(conversationId));
+    }
+    private void requireSender(ConversationMessage message, User user) {
+        if (!message.getSender().getId().equals(user.getId()))
+            throw new ConversationAccessDeniedException("Only the sender can modify this message");
+    }
+    private List<UserConversationUpdate> conversationUpdates(Conversation conversation) {
+        return participants.findAllByConversationId(conversation.getId()).stream()
+                .filter(participant -> participant.getHiddenAt() == null)
+                .map(ConversationParticipant::getUser)
+                .map(user -> new UserConversationUpdate(user.getId(), response(conversation, user))).toList();
     }
     private record UserConversationUpdate(Long userId, ConversationResponse response) {}
-    private void broadcastAfterCommit(ConversationMessageResponse message, List<UserConversationUpdate> updates) {
+    private void broadcastAfterCommit(ConversationMessageEvent event, List<UserConversationUpdate> updates) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
-                broker.convertAndSend("/topic/conversations/" + message.conversationId() + "/messages", message);
-                updates.forEach(update -> broker.convertAndSend(
-                        "/topic/users/" + update.userId() + "/conversations", update.response()));
+                broker.convertAndSend("/topic/conversations/" + event.message().conversationId() + "/messages", event);
+                broadcastListUpdates(updates);
             }
         });
+    }
+    private void broadcastListUpdatesAfterCommit(List<UserConversationUpdate> updates) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { broadcastListUpdates(updates); }
+        });
+    }
+    private void broadcastListUpdates(List<UserConversationUpdate> updates) {
+        updates.forEach(update -> broker.convertAndSend("/topic/users/" + update.userId() + "/conversations",
+                ConversationListEvent.upsert(update.response())));
     }
 }

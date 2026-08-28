@@ -106,6 +106,12 @@ public class WorkspaceController {
         workspaceService.deleteWorkspace(workspaceId, authentication.getName());
     }
 
+    @PostMapping("/{workspaceId}/leave")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void leaveWorkspace(@PathVariable Long workspaceId, Authentication authentication) {
+        workspaceService.leaveWorkspace(workspaceId, authentication.getName());
+    }
+
     @PatchMapping("/{workspaceId}/members/{userId}/role")
     public WorkspaceMemberResponse updateWorkspaceMemberRole(
             @PathVariable Long workspaceId,

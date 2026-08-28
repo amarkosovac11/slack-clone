@@ -20,11 +20,13 @@ export class WorkspaceSettingsComponent {
   readonly currentUserId = input.required<number>();
   readonly workspaceUpdated = output<WorkspaceResponse>();
   readonly workspaceDeleted = output<number>();
+  readonly workspaceLeft = output<number>();
   readonly isOpen = signal(false);
   readonly isSaving = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
   readonly confirmingDelete = signal(false);
+  readonly confirmingLeave = signal(false);
   readonly form = this.formBuilder.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
   });
@@ -36,6 +38,7 @@ export class WorkspaceSettingsComponent {
     this.errorMessage.set(null);
     this.successMessage.set(null);
     this.confirmingDelete.set(false);
+    this.confirmingLeave.set(false);
     this.isOpen.set(true);
   }
 
@@ -63,6 +66,16 @@ export class WorkspaceSettingsComponent {
     this.workspaceService.deleteWorkspace(id).subscribe({
       next: () => { this.isSaving.set(false); this.isOpen.set(false); this.workspaceDeleted.emit(id); },
       error: error => this.handleError(error, 'Could not delete workspace.'),
+    });
+  }
+
+  leaveWorkspace(): void {
+    if (this.workspace().currentUserRole === 'OWNER') return;
+    this.isSaving.set(true); this.errorMessage.set(null);
+    const id = this.workspace().id;
+    this.workspaceService.leaveWorkspace(id).subscribe({
+      next: () => { this.isSaving.set(false); this.isOpen.set(false); this.workspaceLeft.emit(id); },
+      error: error => this.handleError(error, 'Could not leave workspace.'),
     });
   }
 
