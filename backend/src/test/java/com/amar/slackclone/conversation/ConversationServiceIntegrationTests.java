@@ -50,6 +50,8 @@ class ConversationServiceIntegrationTests {
 
     @Test
     void groupIncludesCreatorDeduplicatesIdsAndRejectsOutsiders() {
+        assertThrows(ConversationValidationException.class,
+                () -> service.createGroup(new CreateGroupConversationRequest(List.of(b.getId())), a.getEmail()));
         var group = service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(), b.getId(), c.getId())), a.getEmail());
         assertEquals(ConversationType.GROUP, group.type());
         assertEquals(3, group.participants().size());
