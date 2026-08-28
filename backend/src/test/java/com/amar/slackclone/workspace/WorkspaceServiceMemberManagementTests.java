@@ -183,6 +183,26 @@ class WorkspaceServiceMemberManagementTests {
         verify(workspaceRepository, never()).delete(workspace);
     }
 
+    @ParameterizedTest
+    @EnumSource(value = WorkspaceRole.class, names = {"ADMIN", "MEMBER"})
+    void adminAndMemberCanLeaveWorkspace(WorkspaceRole role) {
+        WorkspaceMember membership = membership(actor, role);
+        when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(membership));
+        service.leaveWorkspace(10L, actor.getEmail());
+        verify(channelMemberRepository).deleteAllByWorkspaceIdAndUserId(10L, 1L);
+        verify(memberRepository).delete(membership);
+        verify(userRepository, never()).delete(actor);
+        verify(workspaceRepository, never()).delete(workspace);
+    }
+
+    @Test
+    void ownerCannotLeaveWorkspace() {
+        WorkspaceMember membership = membership(actor, WorkspaceRole.OWNER);
+        when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(membership));
+        assertThrows(WorkspaceMemberConflictException.class, () -> service.leaveWorkspace(10L, actor.getEmail()));
+        verify(memberRepository, never()).delete(membership);
+    }
+
     private void stubMemberships(WorkspaceMember actorMembership, WorkspaceMember targetMembership) {
         when(memberRepository.findByWorkspaceIdAndUserId(10L, 1L)).thenReturn(Optional.of(actorMembership));
         when(memberRepository.findByWorkspaceIdAndUserId(10L, targetMembership.getUser().getId()))

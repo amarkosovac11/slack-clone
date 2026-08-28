@@ -57,6 +57,16 @@ public void deleteWorkspace(Long workspaceId, String authenticatedEmail) {
 }
 
 @Transactional
+public void leaveWorkspace(Long workspaceId, String authenticatedEmail) {
+    WorkspaceMember membership = workspaceAccessService.requireWorkspaceMember(workspaceId, authenticatedEmail);
+    if (membership.getRole() == WorkspaceRole.OWNER) {
+        throw new WorkspaceMemberConflictException("The workspace owner cannot leave without transferring ownership");
+    }
+    channelMemberRepository.deleteAllByWorkspaceIdAndUserId(workspaceId, membership.getUser().getId());
+    workspaceMemberRepository.delete(membership);
+}
+
+@Transactional
 public WorkspaceResponse createWorkspace(
         CreateWorkspaceRequest request,
         String authenticatedEmail
