@@ -10,6 +10,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     @EntityGraph(attributePaths = "createdBy")
     @Query("select cp.conversation from ConversationParticipant cp where cp.user.id = :userId and cp.leftAt is null and cp.hiddenAt is null order by cp.conversation.updatedAt desc")
     List<Conversation> findAllForUser(@Param("userId") Long userId);
+    @EntityGraph(attributePaths="createdBy")
+    @Query("select cp.conversation from ConversationParticipant cp where cp.user.id=:userId and cp.leftAt is null and cp.hiddenAt is not null order by cp.hiddenAt desc")
+    List<Conversation> findHiddenForUser(@Param("userId") Long userId);
 
     @Query(value = """
         INSERT INTO conversations(type, created_by, direct_key, created_at, updated_at)
