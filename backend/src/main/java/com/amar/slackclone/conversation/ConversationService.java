@@ -230,7 +230,9 @@ public class ConversationService {
             throw new ConversationAccessDeniedException("Only the sender can modify this message");
     }
     private List<UserConversationUpdate> conversationUpdates(Conversation conversation) {
-        return participants.findUserIds(conversation.getId()).stream().map(users::findById).flatMap(Optional::stream)
+        return participants.findAllByConversationId(conversation.getId()).stream()
+                .filter(participant -> participant.getHiddenAt() == null)
+                .map(ConversationParticipant::getUser)
                 .map(user -> new UserConversationUpdate(user.getId(), response(conversation, user))).toList();
     }
     private record UserConversationUpdate(Long userId, ConversationResponse response) {}
