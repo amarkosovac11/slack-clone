@@ -17,6 +17,9 @@ import com.amar.slackclone.workspace.WorkspaceMemberNotFoundException;
 import com.amar.slackclone.message.MessageNotFoundException;
 import com.amar.slackclone.message.MessageAccessDeniedException;
 import com.amar.slackclone.message.MessageConflictException;
+import com.amar.slackclone.conversation.ConversationNotFoundException;
+import com.amar.slackclone.conversation.ConversationAccessDeniedException;
+import com.amar.slackclone.conversation.ConversationValidationException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -32,6 +35,21 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ConversationNotFoundException.class)
+    public ResponseEntity<ApiError> handleConversationNotFound(ConversationNotFoundException e, HttpServletRequest request) {
+        return apiError(HttpStatus.NOT_FOUND, e.getMessage(), request);
+    }
+
+    @ExceptionHandler(ConversationAccessDeniedException.class)
+    public ResponseEntity<ApiError> handleConversationDenied(ConversationAccessDeniedException e, HttpServletRequest request) {
+        return apiError(HttpStatus.FORBIDDEN, e.getMessage(), request);
+    }
+
+    @ExceptionHandler(ConversationValidationException.class)
+    public ResponseEntity<ApiError> handleConversationValidation(ConversationValidationException e, HttpServletRequest request) {
+        return apiError(HttpStatus.BAD_REQUEST, e.getMessage(), request);
+    }
 
     @ExceptionHandler(MessageNotFoundException.class)
     public ResponseEntity<ApiError> handleMessageNotFound(MessageNotFoundException e, HttpServletRequest request) {

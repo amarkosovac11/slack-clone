@@ -22,6 +22,12 @@ export const routes: Routes = [
   },
 
   {
+    path: 'conversations/:conversationId',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/workspaces/workspace-dashboard/workspace-dashboard.component')
+      .then(component => component.WorkspaceDashboardComponent),
+  },
+  {
     path: 'workspaces/:workspaceId/channels/:channelId',
     canActivate: [authGuard],
     loadComponent: () =>

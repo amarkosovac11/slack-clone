@@ -13,6 +13,9 @@ import { ChannelService } from '../../channels/channel.service';
 import { Message } from '../../messages/message.models';
 import { MessageService } from '../../messages/message.service';
 import { MessageWebSocketService } from '../../messages/message-websocket.service';
+import { Conversation, ConversationMessage, ConversationUser } from '../../conversations/conversation.models';
+import { ConversationService } from '../../conversations/conversation.service';
+import { ConversationWebSocketService } from '../../conversations/conversation-websocket.service';
 
 import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
 import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
@@ -51,6 +54,17 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   readonly selectedWorkspaceId = signal<number | null>(null);
   readonly selectedChannel = signal<Channel | null>(null);
+  readonly conversations = signal<Conversation[]>([]);
+  readonly selectedConversation = signal<Conversation | null>(null);
+  readonly conversationMessages = signal<ConversationMessage[]>([]);
+  readonly conversationCursor = signal<number | null>(null);
+  readonly conversationsLoading = signal(false);
+  readonly conversationLoading = signal(false);
+  readonly conversationError = signal<string | null>(null);
+  readonly showStartConversationModal = signal(false);
+  readonly eligibleUsers = signal<ConversationUser[]>([]);
+  readonly selectedConversationUserIds = signal<number[]>([]);
+  readonly conversationModalLoading = signal(false);
 
   readonly selectedWorkspace = computed(() => {
     const workspaceId = this.selectedWorkspaceId();
@@ -165,6 +179,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       ],
     ],
   });
+  readonly conversationMessageForm = this.formBuilder.nonNullable.group({
+    content: ['', [Validators.required, Validators.maxLength(4000)]],
+  });
   readonly editMessageForm = this.formBuilder.nonNullable.group({
     content: ['', [Validators.required, Validators.maxLength(4000)]],
   });
@@ -182,11 +199,15 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     private readonly channelService: ChannelService,
     private readonly messageService: MessageService,
     private readonly messageWebSocketService: MessageWebSocketService,
+    private readonly conversationService: ConversationService,
+    private readonly conversationWebSocketService: ConversationWebSocketService,
   ) {
     this.currentUser = this.authService.currentUser;
     this.webSocketConnected = this.messageWebSocketService.connected;
   }
   private syncSelectionFromRoute(): void {
+    const conversationId = this.parsePositiveRouteId(this.route.snapshot.paramMap.get('conversationId'));
+    if (conversationId !== null) { this.openConversation(conversationId, false); return; }
     const workspaceId = this.parsePositiveRouteId(
       this.route.snapshot.paramMap.get('workspaceId')
     );
@@ -265,13 +286,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     });
 
     this.loadWorkspaces();
+    this.loadConversations();
   }
 
   ngOnDestroy(): void {
     this.messageWebSocketService.disconnect();
+    this.conversationWebSocketService.disconnect();
   }
 
   selectWorkspace(workspaceId: number): void {
+    this.closeConversationSelection();
     void this.router.navigate(['/workspaces']).then(() => {
       this.loadWorkspaceChannels(workspaceId);
     });
@@ -306,6 +330,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     if (workspaceId === null) {
       return;
     }
+    this.closeConversationSelection();
 
     void this.router.navigate([
       '/workspaces',
@@ -465,6 +490,122 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.selectedChannel.set(null); this.messages.set([]); this.messagesError.set(null);
     this.showChannelSettingsModal.set(false); this.channelSettingsLoading.set(false);
     void this.router.navigate(['/workspaces']);
+  }
+
+  loadConversations(): void {
+    this.conversationsLoading.set(true);
+    this.conversationService.list().subscribe({
+      next: conversations => {
+        this.conversations.set(conversations); this.conversationsLoading.set(false);
+        const userId = this.currentUser()?.id;
+        if (userId) this.subscribeToConversationUpdates(userId);
+      },
+      error: () => { this.conversationsLoading.set(false); this.conversationError.set('Could not load direct messages.'); },
+    });
+  }
+
+  openConversation(id: number, navigate = true): void {
+    if (this.selectedConversation()?.id === id && !navigate) return;
+    this.messageWebSocketService.unsubscribeFromChannel();
+    this.selectedChannel.set(null); this.messages.set([]); this.conversationError.set(null);
+    this.conversationLoading.set(true); this.conversationMessages.set([]); this.conversationCursor.set(null);
+    this.conversationService.get(id).subscribe({
+      next: conversation => {
+        this.selectedConversation.set(conversation); this.upsertConversation(conversation);
+        this.conversationWebSocketService.subscribeToConversation(id, message => {
+          if (this.selectedConversation()?.id === id) {
+            this.upsertConversationMessage(message); this.markConversationRead(id);
+          }
+        });
+        this.loadConversationHistory(id);
+        this.markConversationRead(id);
+        if (navigate) void this.router.navigate(['/conversations', id]);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.conversationError.set((error.error as ApiErrorResponse | undefined)?.message ?? 'Could not open conversation.');
+        this.conversationLoading.set(false);
+      },
+    });
+  }
+
+  loadOlderConversationMessages(): void {
+    const conversation = this.selectedConversation(); const before = this.conversationCursor();
+    if (conversation && before !== null && !this.conversationLoading()) this.loadConversationHistory(conversation.id, before);
+  }
+
+  sendConversationMessage(): void {
+    const conversation = this.selectedConversation();
+    if (!conversation || this.conversationMessageForm.invalid) { this.conversationMessageForm.markAllAsTouched(); return; }
+    const content = this.conversationMessageForm.getRawValue().content.trim();
+    if (!content) return;
+    this.conversationError.set(null);
+    if (this.conversationWebSocketService.send(conversation.id, content)) {
+      this.conversationMessageForm.reset({ content: '' }); return;
+    }
+    this.conversationService.send(conversation.id, content).subscribe({
+      next: message => { this.upsertConversationMessage(message); this.conversationMessageForm.reset({ content: '' }); },
+      error: (error: HttpErrorResponse) => this.conversationError.set((error.error as ApiErrorResponse | undefined)?.message ?? 'Could not send message.'),
+    });
+  }
+
+  openStartConversationModal(): void {
+    this.showStartConversationModal.set(true); this.conversationModalLoading.set(true);
+    this.selectedConversationUserIds.set([]); this.conversationError.set(null);
+    this.conversationService.eligibleUsers().subscribe({
+      next: users => { this.eligibleUsers.set(users); this.conversationModalLoading.set(false); },
+      error: () => { this.conversationError.set('Could not load people.'); this.conversationModalLoading.set(false); },
+    });
+  }
+
+  closeStartConversationModal(): void { if (!this.conversationModalLoading()) this.showStartConversationModal.set(false); }
+  toggleConversationUser(userId: number): void {
+    this.selectedConversationUserIds.update(ids => ids.includes(userId) ? ids.filter(id => id !== userId) : [...ids, userId]);
+  }
+  createSelectedConversation(): void {
+    const ids = this.selectedConversationUserIds(); if (ids.length === 0) return;
+    this.conversationModalLoading.set(true);
+    const request = ids.length === 1 ? this.conversationService.startDirect(ids[0]) : this.conversationService.createGroup(ids);
+    request.subscribe({
+      next: conversation => { this.upsertConversation(conversation); this.showStartConversationModal.set(false); this.conversationModalLoading.set(false); this.openConversation(conversation.id); },
+      error: (error: HttpErrorResponse) => { this.conversationError.set((error.error as ApiErrorResponse | undefined)?.message ?? 'Could not create conversation.'); this.conversationModalLoading.set(false); },
+    });
+  }
+
+  private loadConversationHistory(id: number, before?: number): void {
+    this.conversationLoading.set(true);
+    this.conversationService.history(id, before).subscribe({
+      next: page => {
+        if (this.selectedConversation()?.id !== id) return;
+        const merged = new Map(this.conversationMessages().map(message => [message.id, message]));
+        page.messages.forEach(message => merged.set(message.id, message));
+        this.conversationMessages.set([...merged.values()].sort((a, b) => a.id - b.id));
+        this.conversationCursor.set(page.nextBefore); this.conversationLoading.set(false);
+      },
+      error: () => { this.conversationError.set('Could not load messages.'); this.conversationLoading.set(false); },
+    });
+  }
+
+  private closeConversationSelection(): void {
+    this.conversationWebSocketService.unsubscribeConversation(); this.selectedConversation.set(null);
+    this.conversationMessages.set([]); this.conversationCursor.set(null);
+  }
+  private upsertConversationMessage(message: ConversationMessage): void {
+    this.conversationMessages.update(items => items.some(item => item.id === message.id) ? items : [...items, message].sort((a, b) => a.id - b.id));
+  }
+  private upsertConversation(conversation: Conversation): void {
+    this.conversations.update(items => [conversation, ...items.filter(item => item.id !== conversation.id)]
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)));
+    if (this.selectedConversation()?.id === conversation.id) this.selectedConversation.set({ ...conversation, unreadCount: 0 });
+  }
+  private markConversationRead(id: number): void {
+    this.conversationService.markRead(id).subscribe({ next: conversation => this.upsertConversation({ ...conversation, unreadCount: 0 }) });
+  }
+  private subscribeToConversationUpdates(userId: number): void {
+    this.conversationWebSocketService.subscribeToUpdates(userId, conversation => {
+      if (this.selectedConversation()?.id === conversation.id) {
+        this.upsertConversation({ ...conversation, unreadCount: 0 }); this.markConversationRead(conversation.id);
+      } else this.upsertConversation(conversation);
+    });
   }
 
   createChannel(): void {
@@ -752,6 +893,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     }
 
     this.authService.loadCurrentUser().subscribe({
+      next: user => this.subscribeToConversationUpdates(user.id),
       error: () => this.logout(),
     });
   }
@@ -893,7 +1035,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       next: (workspaces) => {
         this.workspaces.set(workspaces);
         this.isLoading.set(false);
-
+        const conversationRouteId = this.parsePositiveRouteId(this.route.snapshot.paramMap.get('conversationId'));
+        if (conversationRouteId !== null && workspaces.length > 0) this.selectedWorkspaceId.set(workspaces[0].id);
         this.syncSelectionFromRoute();
         if (this.selectedWorkspaceId() === null && workspaces.length > 0) {
           this.selectWorkspace(workspaces[0].id);
@@ -943,6 +1086,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   logout(): void {
     this.messageWebSocketService.disconnect();
+    this.conversationWebSocketService.disconnect();
     this.authService.logout();
     void this.router.navigate(['/login']);
   }
