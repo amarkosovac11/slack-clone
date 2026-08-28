@@ -25,6 +25,22 @@ public class ConversationController {
         return service.createGroup(request, auth.getName());
     }
     @GetMapping("/{id}") public ConversationResponse get(@PathVariable Long id, Authentication auth) { return service.get(id, auth.getName()); }
+    @GetMapping("/{id}/participants") public List<ConversationParticipantResponse> participants(@PathVariable Long id, Authentication auth) {
+        return service.participants(id, auth.getName());
+    }
+    @GetMapping("/{id}/eligible-users") public List<ConversationUserResponse> eligibleParticipants(@PathVariable Long id, Authentication auth) {
+        return service.eligibleParticipants(id, auth.getName());
+    }
+    @PostMapping("/{id}/participants") public ConversationResponse addParticipants(@PathVariable Long id,
+            @Valid @RequestBody AddConversationParticipantsRequest request, Authentication auth) {
+        return service.addParticipants(id, request, auth.getName());
+    }
+    @DeleteMapping("/{id}/participants/{userId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeParticipant(@PathVariable Long id, @PathVariable Long userId, Authentication auth) {
+        service.removeParticipant(id, userId, auth.getName());
+    }
+    @PostMapping("/{id}/leave") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void leave(@PathVariable Long id, Authentication auth) { service.leave(id, auth.getName()); }
     @GetMapping("/{id}/messages")
     public ConversationMessagePageResponse history(@PathVariable Long id, @RequestParam(required = false) Long before,
             @RequestParam(defaultValue = "50") @Min(1) @Max(100) int limit, Authentication auth) {

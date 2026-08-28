@@ -11,11 +11,20 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
     List<ConversationMessage> findByConversationIdAndIdLessThanOrderByIdDesc(Long conversationId, Long before, Pageable page);
     @EntityGraph(attributePaths = "sender")
     List<ConversationMessage> findByConversationIdOrderByIdDesc(Long conversationId, Pageable page);
+    @EntityGraph(attributePaths = "sender")
+    List<ConversationMessage> findByConversationIdAndCreatedAtGreaterThanEqualOrderByIdDesc(Long conversationId, java.time.OffsetDateTime joinedAt, Pageable page);
+    @EntityGraph(attributePaths = "sender")
+    List<ConversationMessage> findByConversationIdAndIdLessThanAndCreatedAtGreaterThanEqualOrderByIdDesc(Long conversationId, Long before, java.time.OffsetDateTime joinedAt, Pageable page);
     Optional<ConversationMessage> findTopByConversationIdOrderByIdDesc(Long conversationId);
+    Optional<ConversationMessage> findTopByConversationIdAndCreatedAtGreaterThanEqualOrderByIdDesc(Long conversationId, java.time.OffsetDateTime joinedAt);
     Optional<ConversationMessage> findByIdAndConversationId(Long id, Long conversationId);
 
     @Query("select count(m) from ConversationMessage m where m.conversation.id = :conversationId and m.id > :afterId and m.sender.id <> :userId and m.deletedAt is null")
     long countUnread(@Param("conversationId") Long conversationId, @Param("afterId") Long afterId, @Param("userId") Long userId);
+
+    @Query("select count(m) from ConversationMessage m where m.conversation.id = :conversationId and m.createdAt >= :joinedAt and m.id > :afterId and m.sender.id <> :userId and m.deletedAt is null")
+    long countUnreadSince(@Param("conversationId") Long conversationId, @Param("joinedAt") java.time.OffsetDateTime joinedAt,
+            @Param("afterId") Long afterId, @Param("userId") Long userId);
 
     @EntityGraph(attributePaths = "sender")
     @Query("""

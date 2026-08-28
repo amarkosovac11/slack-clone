@@ -19,7 +19,8 @@ public class ConversationAccessService {
         User user = requireUser(email);
         conversations.findById(conversationId).orElseThrow(() -> new ConversationNotFoundException(conversationId));
         return participants.findByConversationIdAndUserId(conversationId, user.getId())
-                .orElseThrow(() -> new ConversationAccessDeniedException("You are not a participant in this conversation"));
+                .filter(ConversationParticipant::isActive)
+                .orElseThrow(() -> new ConversationAccessDeniedException("You are not an active participant in this conversation"));
     }
     public User requireUser(String email) {
         return users.findByEmailIgnoreCase(email).orElseThrow(AuthenticatedUserNotFoundException::new);

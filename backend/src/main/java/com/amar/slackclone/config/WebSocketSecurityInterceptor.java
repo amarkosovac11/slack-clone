@@ -24,7 +24,7 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
     private static final Pattern CHANNEL_TOPIC = Pattern.compile(
         "^/topic/workspaces/(\\d+)/channels/(\\d+)/messages$"
     );
-    private static final Pattern CONVERSATION_TOPIC = Pattern.compile("^/topic/conversations/(\\d+)/messages$");
+    private static final Pattern CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations/(\\d+)/(?:messages|metadata)$");
     private static final Pattern USER_CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
     private static final Pattern CONVERSATION_SEND = Pattern.compile("^/app/conversations/(\\d+)/messages$");
 
@@ -103,7 +103,11 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
             return;
         }
         matcher = CONVERSATION_TOPIC.matcher(safeDestination);
-        if (matcher.matches()) { conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)), accessor.getUser().getName()); return; }
+        if (matcher.matches()) {
+            var user = conversationAccessService.requireUser(accessor.getUser().getName());
+            if (!user.getId().equals(Long.valueOf(matcher.group(1)))) throw new IllegalArgumentException("Cannot subscribe to another user's conversation");
+            conversationAccessService.requireParticipant(Long.valueOf(matcher.group(2)), accessor.getUser().getName()); return;
+        }
         matcher = USER_CONVERSATION_TOPIC.matcher(safeDestination);
         if (matcher.matches()) {
             var user = conversationAccessService.requireUser(accessor.getUser().getName());
