@@ -1,5 +1,7 @@
 export type ConversationType = 'DIRECT' | 'GROUP';
 export interface ConversationUser { id: number; displayName: string; email: string; }
+export interface ConversationParticipant { userId: number; displayName: string; avatarUrl: string | null; joinedAt: string; role: 'CREATOR' | 'MEMBER'; }
+export interface ConversationMetadataEvent { type: 'PARTICIPANT_ADDED' | 'PARTICIPANT_REMOVED' | 'PARTICIPANT_LEFT'; conversationId: number; affectedUserId: number | null; }
 export interface ConversationMessage { id: number; conversationId: number; senderId: number; senderDisplayName: string; content: string | null; createdAt: string; updatedAt: string; deletedAt: string | null; }
 export interface Conversation { id: number; type: ConversationType; participants: ConversationUser[]; customName: string | null; displayName: string; lastMessage: ConversationMessage | null; unreadCount: number; createdAt: string; updatedAt: string; }
 export interface ConversationMessagePage { messages: ConversationMessage[]; nextBefore: number | null; }

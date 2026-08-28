@@ -18,17 +18,19 @@ class ConversationServiceIntegrationTests {
     @Autowired UserRepository users;
     @Autowired WorkspaceRepository workspaces;
     @Autowired WorkspaceMemberRepository workspaceMembers;
-    private User a, b, c, outsider;
+    @Autowired ConversationParticipantRepository conversationParticipants;
+    private User a, b, c, d, outsider;
 
     @BeforeEach
     void setUp() {
         String suffix = System.nanoTime() + "@example.com";
         a = saveUser("a" + suffix, "Amar"); b = saveUser("b" + suffix, "Faris");
-        c = saveUser("c" + suffix, "Haris"); outsider = saveUser("d" + suffix, "Outsider");
+        c = saveUser("c" + suffix, "Haris"); d = saveUser("d" + suffix, "Nedim"); outsider = saveUser("x" + suffix, "Outsider");
         Workspace workspace = workspaces.save(new Workspace("Team", "team-" + System.nanoTime(), a, Instant.now(), Instant.now()));
         workspaceMembers.save(new WorkspaceMember(workspace, a, WorkspaceRole.OWNER, Instant.now()));
         workspaceMembers.save(new WorkspaceMember(workspace, b, WorkspaceRole.MEMBER, Instant.now()));
         workspaceMembers.save(new WorkspaceMember(workspace, c, WorkspaceRole.MEMBER, Instant.now()));
+        workspaceMembers.save(new WorkspaceMember(workspace, d, WorkspaceRole.MEMBER, Instant.now()));
         workspaceMembers.flush();
     }
 
@@ -136,6 +138,57 @@ class ConversationServiceIntegrationTests {
         service.hide(direct.id(), a.getEmail());
         service.send(direct.id(), new CreateConversationMessageRequest("welcome back"), b.getEmail());
         assertEquals(direct.id(), service.list(a.getEmail()).getFirst().id());
+    }
+
+    @Test
+    void activeMembersCanListAndInviteWhileOutsidersAndFormerMembersCannot() {
+        var group = service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(), c.getId())), a.getEmail());
+        assertEquals(3, service.participants(group.id(), b.getEmail()).size());
+        assertEquals("CREATOR", service.participants(group.id(), b.getEmail()).stream()
+                .filter(member -> member.userId().equals(a.getId())).findFirst().orElseThrow().role());
+        assertThrows(ConversationAccessDeniedException.class, () -> service.participants(group.id(), outsider.getEmail()));
+        assertThrows(ConversationAccessDeniedException.class, () -> service.addParticipants(group.id(),
+                new AddConversationParticipantsRequest(List.of(outsider.getId())), b.getEmail()));
+        service.addParticipants(group.id(), new AddConversationParticipantsRequest(List.of(d.getId())), b.getEmail());
+        assertEquals(4, service.participants(group.id(), a.getEmail()).size());
+        assertThrows(ConversationValidationException.class, () -> service.addParticipants(group.id(),
+                new AddConversationParticipantsRequest(List.of(d.getId())), a.getEmail()));
+        service.leave(group.id(), d.getEmail());
+        assertThrows(ConversationAccessDeniedException.class, () -> service.participants(group.id(), d.getEmail()));
+    }
+
+    @Test
+    void joiningAndRejoiningCreateNewPrivateHistoryBoundaries() {
+        var group = service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(), c.getId())), a.getEmail());
+        service.send(group.id(), new CreateConversationMessageRequest("before join"), a.getEmail());
+        service.addParticipants(group.id(), new AddConversationParticipantsRequest(List.of(d.getId())), b.getEmail());
+        assertTrue(service.history(group.id(), null, 50, d.getEmail()).messages().isEmpty());
+        assertEquals(0, service.get(group.id(), d.getEmail()).unreadCount());
+        service.send(group.id(), new CreateConversationMessageRequest("after join"), a.getEmail());
+        assertEquals(List.of("after join"), service.history(group.id(), null, 50, d.getEmail()).messages().stream().map(ConversationMessageResponse::content).toList());
+        service.leave(group.id(), d.getEmail());
+        assertThrows(ConversationAccessDeniedException.class, () -> service.send(group.id(), new CreateConversationMessageRequest("blocked"), d.getEmail()));
+        service.send(group.id(), new CreateConversationMessageRequest("while away"), a.getEmail());
+        var priorMembership = conversationParticipants.findByConversationIdAndUserId(group.id(), d.getId()).orElseThrow();
+        var priorJoinedAt = priorMembership.getJoinedAt();
+        service.addParticipants(group.id(), new AddConversationParticipantsRequest(List.of(d.getId())), a.getEmail());
+        assertTrue(priorMembership.getJoinedAt().isAfter(priorJoinedAt));
+        assertNull(priorMembership.getLeftAt());
+        assertTrue(service.history(group.id(), null, 50, d.getEmail()).messages().isEmpty());
+    }
+
+    @Test
+    void onlyCreatorRemovesOthersAndCreatorCannotLeaveWithMembers() {
+        var group = service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(), c.getId())), a.getEmail());
+        assertThrows(ConversationAccessDeniedException.class, () -> service.removeParticipant(group.id(), c.getId(), b.getEmail()));
+        assertThrows(ConversationValidationException.class, () -> service.removeParticipant(group.id(), a.getId(), a.getEmail()));
+        service.removeParticipant(group.id(), c.getId(), a.getEmail());
+        assertThrows(ConversationAccessDeniedException.class, () -> service.get(group.id(), c.getEmail()));
+        assertTrue(service.list(c.getEmail()).isEmpty());
+        assertThrows(ConversationValidationException.class, () -> service.leave(group.id(), a.getEmail()));
+        service.leave(group.id(), b.getEmail());
+        service.leave(group.id(), a.getEmail());
+        assertTrue(service.list(a.getEmail()).isEmpty());
     }
 
     private User saveUser(String email, String name) {

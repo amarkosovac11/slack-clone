@@ -13,7 +13,7 @@ import { ChannelService } from '../../channels/channel.service';
 import { Message } from '../../messages/message.models';
 import { MessageService } from '../../messages/message.service';
 import { MessageWebSocketService } from '../../messages/message-websocket.service';
-import { Conversation, ConversationMessage, ConversationUser } from '../../conversations/conversation.models';
+import { Conversation, ConversationMessage, ConversationParticipant, ConversationUser } from '../../conversations/conversation.models';
 import { ConversationService } from '../../conversations/conversation.service';
 import { ConversationWebSocketService } from '../../conversations/conversation-websocket.service';
 
@@ -71,6 +71,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly conversationActionLoading = signal(false);
   readonly editingConversationMessageId = signal<number | null>(null);
   readonly conversationMessagePendingDelete = signal<ConversationMessage | null>(null);
+  readonly showGroupMembersModal = signal(false);
+  readonly groupMembers = signal<ConversationParticipant[]>([]);
+  readonly groupEligibleUsers = signal<ConversationUser[]>([]);
+  readonly selectedGroupUserIds = signal<number[]>([]);
+  readonly groupMembersLoading = signal(false);
+  readonly groupMemberActionUserId = signal<number | null>(null);
+  readonly groupMemberPendingRemove = signal<ConversationParticipant | null>(null);
+  readonly confirmingGroupLeave = signal(false);
+  readonly currentGroupCreator = computed(() => this.groupMembers().find(member => member.role === 'CREATOR') ?? null);
+  readonly currentUserIsGroupCreator = computed(() => this.currentGroupCreator()?.userId === this.currentUser()?.id);
 
   readonly selectedWorkspace = computed(() => {
     const workspaceId = this.selectedWorkspaceId();
@@ -532,12 +542,14 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.conversationService.get(id).subscribe({
       next: conversation => {
         this.selectedConversation.set(conversation); this.upsertConversation(conversation);
-        this.conversationWebSocketService.subscribeToConversation(id, event => {
+        const userId = this.currentUser()?.id;
+        if (!userId) return;
+        this.conversationWebSocketService.subscribeToConversation(id, userId, event => {
           if (this.selectedConversation()?.id === id) {
             this.upsertConversationMessage(event.message);
             if (event.type === 'CREATED') this.markConversationRead(id);
           }
-        });
+        }, () => { if (this.selectedConversation()?.id === id) { this.refreshSelectedConversation(id); if (this.showGroupMembersModal()) this.loadGroupMembers(id); } });
         this.loadConversationHistory(id);
         this.markConversationRead(id);
         if (navigate) void this.router.navigate(['/conversations', id]);
@@ -593,6 +605,34 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   toggleConversationMenu(): void { this.showConversationMenu.update(open => !open); }
+  openGroupMembers(): void {
+    const conversation = this.selectedConversation(); if (!conversation || conversation.type !== 'GROUP') return;
+    this.showConversationMenu.set(false); this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
+  }
+  closeGroupMembers(): void { if (!this.groupMembersLoading() && this.groupMemberActionUserId() === null) this.showGroupMembersModal.set(false); }
+  toggleGroupUser(userId: number): void { this.selectedGroupUserIds.update(ids => ids.includes(userId) ? ids.filter(id => id !== userId) : [...ids, userId]); }
+  addSelectedGroupUsers(): void {
+    const conversation = this.selectedConversation(); const ids = this.selectedGroupUserIds(); if (!conversation || ids.length === 0) return;
+    this.groupMembersLoading.set(true); this.conversationService.addParticipants(conversation.id, ids).subscribe({
+      next: updated => { this.upsertConversation(updated); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id); },
+      error: error => { this.groupMembersLoading.set(false); this.handleConversationActionError(error, 'Could not add people.'); },
+    });
+  }
+  requestRemoveGroupMember(member: ConversationParticipant): void { this.groupMemberPendingRemove.set(member); }
+  confirmRemoveGroupMember(): void {
+    const conversation = this.selectedConversation(); const member = this.groupMemberPendingRemove(); if (!conversation || !member) return;
+    this.groupMemberActionUserId.set(member.userId); this.conversationService.removeParticipant(conversation.id, member.userId).subscribe({
+      next: () => { this.groupMemberPendingRemove.set(null); this.groupMemberActionUserId.set(null); this.loadGroupMembers(conversation.id); this.refreshSelectedConversation(conversation.id); },
+      error: error => { this.groupMemberActionUserId.set(null); this.handleConversationActionError(error, 'Could not remove member.'); },
+    });
+  }
+  confirmLeaveGroup(): void {
+    const conversation = this.selectedConversation(); if (!conversation) return;
+    this.conversationActionLoading.set(true); this.conversationService.leave(conversation.id).subscribe({
+      next: () => this.removeConversationFromUi(conversation.id),
+      error: error => { this.confirmingGroupLeave.set(false); this.handleConversationActionError(error, 'Could not leave group.'); },
+    });
+  }
   openRenameConversation(): void {
     const conversation = this.selectedConversation(); if (!conversation || conversation.type !== 'GROUP') return;
     this.renameConversationForm.reset({ name: conversation.customName ?? '' });
@@ -660,6 +700,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.conversationWebSocketService.unsubscribeConversation(); this.selectedConversation.set(null);
     this.conversationMessages.set([]); this.conversationCursor.set(null);
     this.showConversationMenu.set(false); this.editingConversationMessageId.set(null); this.conversationMessagePendingDelete.set(null);
+    this.showGroupMembersModal.set(false); this.confirmingGroupLeave.set(false); this.groupMembers.set([]);
   }
   private upsertConversationMessage(message: ConversationMessage): void {
     this.conversationMessages.update(items => items.some(item => item.id === message.id)
@@ -694,6 +735,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   private handleConversationActionError(error: HttpErrorResponse, fallback: string): void {
     this.conversationError.set((error.error as ApiErrorResponse | undefined)?.message ?? fallback);
     this.conversationActionLoading.set(false);
+  }
+  private loadGroupMembers(id: number): void {
+    this.groupMembersLoading.set(true);
+    forkJoin({ members: this.conversationService.participants(id), eligible: this.conversationService.eligibleParticipants(id) }).subscribe({
+      next: result => { this.groupMembers.set(result.members); this.groupEligibleUsers.set(result.eligible); this.groupMembersLoading.set(false); },
+      error: error => { this.groupMembersLoading.set(false); this.handleConversationActionError(error, 'Could not load group members.'); },
+    });
+  }
+  private refreshSelectedConversation(id: number): void {
+    this.conversationService.get(id).subscribe({ next: conversation => this.upsertConversation(conversation), error: () => undefined });
   }
 
   createChannel(): void {

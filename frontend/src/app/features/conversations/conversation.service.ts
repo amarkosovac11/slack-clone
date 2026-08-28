@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Conversation, ConversationMessage, ConversationMessagePage, ConversationUser } from './conversation.models';
+import { Conversation, ConversationMessage, ConversationMessagePage, ConversationParticipant, ConversationUser } from './conversation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConversationService {
@@ -10,6 +10,11 @@ export class ConversationService {
   list(): Observable<Conversation[]> { return this.http.get<Conversation[]>(this.url); }
   get(id: number): Observable<Conversation> { return this.http.get<Conversation>(`${this.url}/${id}`); }
   eligibleUsers(): Observable<ConversationUser[]> { return this.http.get<ConversationUser[]>(`${this.url}/eligible-users`); }
+  participants(id: number): Observable<ConversationParticipant[]> { return this.http.get<ConversationParticipant[]>(`${this.url}/${id}/participants`); }
+  eligibleParticipants(id: number): Observable<ConversationUser[]> { return this.http.get<ConversationUser[]>(`${this.url}/${id}/eligible-users`); }
+  addParticipants(id: number, userIds: number[]): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/${id}/participants`, { userIds }); }
+  removeParticipant(id: number, userId: number): Observable<void> { return this.http.delete<void>(`${this.url}/${id}/participants/${userId}`); }
+  leave(id: number): Observable<void> { return this.http.post<void>(`${this.url}/${id}/leave`, {}); }
   startDirect(userId: number): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/direct`, { userId }); }
   createGroup(participantIds: number[]): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/group`, { participantIds }); }
   history(id: number, before?: number, limit = 50): Observable<ConversationMessagePage> {

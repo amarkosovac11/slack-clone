@@ -8,7 +8,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Long
     Optional<Conversation> findByDirectKey(String directKey);
 
     @EntityGraph(attributePaths = "createdBy")
-    @Query("select cp.conversation from ConversationParticipant cp where cp.user.id = :userId and cp.hiddenAt is null order by cp.conversation.updatedAt desc")
+    @Query("select cp.conversation from ConversationParticipant cp where cp.user.id = :userId and cp.leftAt is null and cp.hiddenAt is null order by cp.conversation.updatedAt desc")
     List<Conversation> findAllForUser(@Param("userId") Long userId);
 
     @Query(value = """
