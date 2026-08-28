@@ -1,13 +1,15 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Conversation, ConversationMessage, ConversationMessagePage, ConversationParticipant, ConversationUser } from './conversation.models';
+import { Conversation, ConversationMessage, ConversationMessagePage, ConversationParticipant, ConversationReadReceipt, ConversationUser } from './conversation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConversationService {
   private readonly url = 'http://localhost:8080/api/conversations';
   constructor(private readonly http: HttpClient) {}
   list(): Observable<Conversation[]> { return this.http.get<Conversation[]>(this.url); }
+  hidden():Observable<Conversation[]>{return this.http.get<Conversation[]>(`${this.url}/hidden`);}
+  restore(id:number):Observable<Conversation>{return this.http.post<Conversation>(`${this.url}/${id}/restore`,{});}
   get(id: number): Observable<Conversation> { return this.http.get<Conversation>(`${this.url}/${id}`); }
   eligibleUsers(): Observable<ConversationUser[]> { return this.http.get<ConversationUser[]>(`${this.url}/eligible-users`); }
   participants(id: number): Observable<ConversationParticipant[]> { return this.http.get<ConversationParticipant[]>(`${this.url}/${id}/participants`); }
@@ -15,6 +17,8 @@ export class ConversationService {
   addParticipants(id: number, userIds: number[]): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/${id}/participants`, { userIds }); }
   removeParticipant(id: number, userId: number): Observable<void> { return this.http.delete<void>(`${this.url}/${id}/participants/${userId}`); }
   leave(id: number): Observable<void> { return this.http.post<void>(`${this.url}/${id}/leave`, {}); }
+  transferCreator(id:number,newCreatorUserId:number):Observable<Conversation>{return this.http.post<Conversation>(`${this.url}/${id}/transfer-creator`,{newCreatorUserId});}
+  receipt(id:number,messageId:number):Observable<ConversationReadReceipt>{return this.http.get<ConversationReadReceipt>(`${this.url}/${id}/messages/${messageId}/receipt`);}
   startDirect(userId: number): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/direct`, { userId }); }
   createGroup(participantIds: number[]): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/group`, { participantIds }); }
   history(id: number, before?: number, limit = 50): Observable<ConversationMessagePage> {

@@ -20,12 +20,13 @@ public class ConversationService {
     private final WorkspaceMemberRepository workspaceMembers;
     private final ConversationAccessService access;
     private final SimpMessagingTemplate broker;
+    private final ConversationMessageMentionRepository mentionRepository;
 
     public ConversationService(ConversationRepository conversations, ConversationParticipantRepository participants,
             ConversationMessageRepository messages, UserRepository users, WorkspaceMemberRepository workspaceMembers,
-            ConversationAccessService access, SimpMessagingTemplate broker) {
+            ConversationAccessService access, SimpMessagingTemplate broker, ConversationMessageMentionRepository mentionRepository) {
         this.conversations = conversations; this.participants = participants; this.messages = messages;
-        this.users = users; this.workspaceMembers = workspaceMembers; this.access = access; this.broker = broker;
+        this.users = users; this.workspaceMembers = workspaceMembers; this.access = access; this.broker = broker; this.mentionRepository=mentionRepository;
     }
 
     @Transactional
@@ -73,6 +74,8 @@ public class ConversationService {
         User user = access.requireUser(email);
         return conversations.findAllForUser(user.getId()).stream().map(c -> response(c, user)).toList();
     }
+    @Transactional(readOnly=true) public List<ConversationResponse> hidden(String email){User u=access.requireUser(email);return conversations.findHiddenForUser(u.getId()).stream().map(c->response(c,u)).toList();}
+    @Transactional public ConversationResponse restore(Long id,String email){ConversationParticipant p=access.requireParticipant(id,email);p.setHiddenAt(null);ConversationResponse r=response(p.getConversation(),p.getUser());broadcastListUpdatesAfterCommit(List.of(new UserConversationUpdate(p.getUser().getId(),r)));return r;}
 
     @Transactional(readOnly = true)
     public ConversationResponse get(Long id, String email) {
@@ -109,7 +112,7 @@ public class ConversationService {
             throw new ConversationValidationException("A group needs at least two active participants to send messages");
         ConversationMessage message = new ConversationMessage(); message.setConversation(conversation);
         message.setSender(senderMembership.getUser()); message.setContent(request.content().trim());
-        message = messages.saveAndFlush(message); senderMembership.setLastReadMessage(message); conversation.touch();
+        message = messages.saveAndFlush(message); persistMentions(message); senderMembership.setLastReadMessage(message); conversation.touch();
         participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(id).forEach(participant -> participant.setHiddenAt(null));
         ConversationMessageResponse result = messageResponse(message);
         List<UserConversationUpdate> updates = conversationUpdates(conversation);
@@ -140,6 +143,7 @@ public class ConversationService {
         String content = request.content() == null ? "" : request.content().trim();
         if (content.isEmpty()) throw new ConversationValidationException("Message content cannot be empty");
         message.edit(content);
+        mentionRepository.deleteAllByMessageId(messageId); persistMentions(message);
         ConversationMessageResponse result = messageResponse(message);
         broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.UPDATED, result),
                 conversationUpdates(participant.getConversation()));
@@ -153,6 +157,7 @@ public class ConversationService {
         requireSender(message, participant.getUser());
         if (message.getDeletedAt() != null) throw new ConversationValidationException("Message is already deleted");
         message.softDelete();
+        mentionRepository.deleteAllByMessageId(messageId);
         ConversationMessageResponse result = messageResponse(message);
         broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.DELETED, result),
                 conversationUpdates(participant.getConversation()));
@@ -177,10 +182,23 @@ public class ConversationService {
         ConversationResponse result = response(participant.getConversation(), participant.getUser());
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() { broker.convertAndSend(
-                    "/topic/users/" + participant.getUser().getId() + "/conversations", ConversationListEvent.upsert(result)); }
+                    "/topic/users/" + participant.getUser().getId() + "/conversations", ConversationListEvent.upsert(result));
+                participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(id).forEach(member -> broker.convertAndSend(
+                    "/topic/users/"+member.getUser().getId()+"/conversations/"+id+"/metadata",new ConversationMetadataEvent("READ_UPDATED",id,participant.getUser().getId()))); }
         });
         return result;
     }
+    @Transactional(readOnly=true)
+    public ConversationReadReceiptResponse receipt(Long id,Long messageId,String email){access.requireParticipant(id,email);ConversationMessage m=requireMessage(id,messageId);
+        var eligible=participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(id).stream().filter(p->!p.getUser().getId().equals(m.getSender().getId())&&!p.getJoinedAt().isAfter(m.getCreatedAt())).toList();
+        var readers=eligible.stream().filter(p->p.getLastReadMessage()!=null&&p.getLastReadMessage().getId()>=m.getId()).map(p->p.getUser().getDisplayName()).toList();
+        return new ConversationReadReceiptResponse(messageId,readers.size(),eligible.size(),readers);}
+
+    @Transactional public ConversationResponse transferCreator(Long id,TransferConversationCreatorRequest request,String email){ConversationParticipant actor=access.requireParticipant(id,email);Conversation c=requireGroup(actor.getConversation());
+        if(!c.getCreatedBy().getId().equals(actor.getUser().getId()))throw new ConversationAccessDeniedException("Only the current creator can transfer creator rights");
+        ConversationParticipant target=participants.findByConversationIdAndUserId(id,request.newCreatorUserId()).filter(ConversationParticipant::isActive).orElseThrow(()->new ConversationValidationException("New creator must be an active participant"));
+        if(target.getUser().getId().equals(actor.getUser().getId()))throw new ConversationValidationException("Select another participant");c.setCreatedBy(target.getUser());c.touch();
+        ConversationResponse result=response(c,actor.getUser());broadcastMembershipAfterCommit(c,"CREATOR_TRANSFERRED",target.getUser().getId());return result;}
 
     @Transactional(readOnly = true)
     public List<ConversationParticipantResponse> participants(Long id, String email) {
@@ -309,7 +327,8 @@ public class ConversationService {
     private ConversationUserResponse userResponse(User u) { return new ConversationUserResponse(u.getId(), u.getDisplayName(), u.getEmail()); }
     private ConversationMessageResponse messageResponse(ConversationMessage m) {
         return new ConversationMessageResponse(m.getId(), m.getConversation().getId(), m.getSender().getId(),
-                m.getSender().getDisplayName(), m.getContent(), m.getCreatedAt(), m.getUpdatedAt(), m.getDeletedAt());
+                m.getSender().getDisplayName(), m.getContent(), m.getCreatedAt(), m.getUpdatedAt(), m.getDeletedAt(), mentionRepository.findAllByMessageId(m.getId()).stream().map(x -> {
+                    User u=x.getUser(); return new com.amar.slackclone.message.dto.MentionResponse(u.getId(),u.getDisplayName(),handle(u)); }).toList());
     }
     private ConversationMessage requireMessage(Long conversationId, Long messageId) {
         return messages.findByIdAndConversationId(messageId, conversationId)
@@ -344,4 +363,7 @@ public class ConversationService {
         updates.forEach(update -> broker.convertAndSend("/topic/users/" + update.userId() + "/conversations",
                 ConversationListEvent.upsert(update.response())));
     }
+    private static final java.util.regex.Pattern MENTION=java.util.regex.Pattern.compile("(?<![\\w@])@([A-Za-z0-9._-]+)");
+    private void persistMentions(ConversationMessage message) { var eligible=participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(message.getConversation().getId()).stream().map(ConversationParticipant::getUser).toList(); var grouped=eligible.stream().collect(java.util.stream.Collectors.groupingBy(u->handle(u).toLowerCase(java.util.Locale.ROOT))); var matcher=MENTION.matcher(message.getContent()); Set<Long> seen=new HashSet<>(); while(matcher.find()){var found=grouped.get(matcher.group(1).toLowerCase(java.util.Locale.ROOT));if(found!=null&&found.size()==1&&seen.add(found.getFirst().getId()))mentionRepository.save(new ConversationMessageMention(message,found.getFirst()));}}
+    private String handle(User u){return u.getEmail().substring(0,u.getEmail().indexOf('@'));}
 }

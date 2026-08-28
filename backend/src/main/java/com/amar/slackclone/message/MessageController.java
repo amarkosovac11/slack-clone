@@ -3,6 +3,7 @@ package com.amar.slackclone.message;
 import com.amar.slackclone.message.dto.CreateMessageRequest;
 import com.amar.slackclone.message.dto.MessageResponse;
 import com.amar.slackclone.message.dto.UpdateMessageRequest;
+import com.amar.slackclone.message.dto.PinnedMessageResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,4 +68,7 @@ public class MessageController {
             @PathVariable Long messageId, Authentication authentication) {
         return messageService.deleteMessage(workspaceId, channelId, messageId, authentication.getName());
     }
+    @PostMapping("/{messageId}/pin") public PinnedMessageResponse pin(@PathVariable Long workspaceId,@PathVariable Long channelId,@PathVariable Long messageId,Authentication a){return messageService.pin(workspaceId,channelId,messageId,a.getName());}
+    @DeleteMapping("/{messageId}/pin") @ResponseStatus(HttpStatus.NO_CONTENT) public void unpin(@PathVariable Long workspaceId,@PathVariable Long channelId,@PathVariable Long messageId,Authentication a){messageService.unpin(workspaceId,channelId,messageId,a.getName());}
+    @GetMapping("/pins") public List<PinnedMessageResponse> pins(@PathVariable Long workspaceId,@PathVariable Long channelId,Authentication a){return messageService.pins(workspaceId,channelId,a.getName());}
 }

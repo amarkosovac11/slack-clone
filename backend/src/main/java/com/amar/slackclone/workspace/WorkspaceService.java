@@ -9,6 +9,7 @@ import com.amar.slackclone.workspace.dto.WorkspaceResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceRequest;
+import com.amar.slackclone.workspace.dto.TransferWorkspaceOwnershipRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +49,20 @@ public WorkspaceResponse updateWorkspace(Long workspaceId, UpdateWorkspaceReques
     workspace.setName(request.name().trim());
     workspace.setUpdatedAt(Instant.now());
     return toWorkspaceResponse(membership);
+}
+
+@Transactional
+public WorkspaceResponse transferOwnership(Long workspaceId, TransferWorkspaceOwnershipRequest request, String email) {
+    WorkspaceMember actor = workspaceAccessService.requireOwner(workspaceId, email);
+    Workspace locked = workspaceRepository.findByIdForUpdate(workspaceId).orElseThrow();
+    if (!locked.getOwner().getId().equals(actor.getUser().getId()))
+        throw new WorkspaceMemberAccessDeniedException("Only the current owner can transfer ownership");
+    WorkspaceMember target = getTargetMembership(workspaceId, request.newOwnerUserId());
+    if (target.getUser().getId().equals(actor.getUser().getId()))
+        throw new WorkspaceMemberConflictException("Select another active member");
+    target.setRole(WorkspaceRole.OWNER); actor.setRole(WorkspaceRole.ADMIN); locked.setOwner(target.getUser()); locked.setUpdatedAt(Instant.now());
+    workspaceMemberRepository.flush();
+    return toWorkspaceResponse(actor);
 }
 
 @Transactional

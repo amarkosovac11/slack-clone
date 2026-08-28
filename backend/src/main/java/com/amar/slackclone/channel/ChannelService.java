@@ -120,6 +120,9 @@ public class ChannelService {
         channel.setArchivedAt(OffsetDateTime.now());
         return toResponse(channel);
     }
+    @Transactional(readOnly=true)
+    public List<ChannelResponse> getArchivedChannels(Long workspaceId,String email){requireManager(workspaceId,email);return channelRepository.findAllByWorkspaceIdAndArchivedAtIsNotNullOrderByArchivedAtDesc(workspaceId).stream().map(this::toResponse).toList();}
+    @Transactional public ChannelResponse unarchiveChannel(Long workspaceId,Long channelId,String email){requireManager(workspaceId,email);Channel c=requireChannel(workspaceId,channelId);if(!c.isArchived())throw new ChannelConflictException("Channel is not archived");c.setArchivedAt(null);return toResponse(c);}
 
     @Transactional
     public void deleteChannel(Long workspaceId, Long channelId, String email) {

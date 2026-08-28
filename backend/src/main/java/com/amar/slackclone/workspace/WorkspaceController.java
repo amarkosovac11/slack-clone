@@ -7,6 +7,7 @@ import com.amar.slackclone.workspace.dto.WorkspaceResponse;
 import com.amar.slackclone.workspace.dto.WorkspaceMemberResponse;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceMemberRoleRequest;
 import com.amar.slackclone.workspace.dto.UpdateWorkspaceRequest;
+import com.amar.slackclone.workspace.dto.TransferWorkspaceOwnershipRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -110,6 +111,11 @@ public class WorkspaceController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void leaveWorkspace(@PathVariable Long workspaceId, Authentication authentication) {
         workspaceService.leaveWorkspace(workspaceId, authentication.getName());
+    }
+    @PostMapping("/{workspaceId}/transfer-ownership")
+    public WorkspaceResponse transferOwnership(@PathVariable Long workspaceId,
+            @Valid @RequestBody TransferWorkspaceOwnershipRequest request, Authentication authentication) {
+        return workspaceService.transferOwnership(workspaceId, request, authentication.getName());
     }
 
     @PatchMapping("/{workspaceId}/members/{userId}/role")

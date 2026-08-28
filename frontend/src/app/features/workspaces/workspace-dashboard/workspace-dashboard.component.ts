@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 
 import { Channel, ChannelMember } from '../../channels/channel.models';
 import { ChannelService } from '../../channels/channel.service';
-import { Message } from '../../messages/message.models';
+import { Message, PinnedMessage } from '../../messages/message.models';
 import { MessageService } from '../../messages/message.service';
 import { MessageWebSocketService } from '../../messages/message-websocket.service';
 import { Conversation, ConversationMessage, ConversationParticipant, ConversationUser } from '../../conversations/conversation.models';
@@ -79,6 +79,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly groupMemberActionUserId = signal<number | null>(null);
   readonly groupMemberPendingRemove = signal<ConversationParticipant | null>(null);
   readonly confirmingGroupLeave = signal(false);
+  readonly hiddenConversations=signal<Conversation[]>([]); readonly showHiddenConversations=signal(false);
+  readonly archivedChannels=signal<Channel[]>([]); readonly showArchivedChannels=signal(false);
+  readonly pinnedMessages=signal<PinnedMessage[]>([]); readonly showPinnedMessages=signal(false);
+  readonly conversationReceipts=signal<Record<number,string>>({}); readonly creatorTransferTarget=signal<ConversationParticipant|null>(null);
   readonly currentGroupCreator = computed(() => this.groupMembers().find(member => member.role === 'CREATOR') ?? null);
   readonly currentUserIsGroupCreator = computed(() => this.currentGroupCreator()?.userId === this.currentUser()?.id);
 
@@ -533,6 +537,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       error: () => { this.conversationsLoading.set(false); this.conversationError.set('Could not load direct messages.'); },
     });
   }
+  openHiddenConversations():void{this.showHiddenConversations.set(true);this.conversationService.hidden().subscribe(x=>this.hiddenConversations.set(x));}
+  restoreConversation(c:Conversation):void{this.conversationService.restore(c.id).subscribe(x=>{this.hiddenConversations.update(items=>items.filter(i=>i.id!==c.id));this.upsertConversation(x);});}
+  openArchivedChannels():void{const id=this.selectedWorkspaceId();if(!id)return;this.showArchivedChannels.set(true);this.channelService.archivedChannels(id).subscribe(x=>this.archivedChannels.set(x));}
+  unarchiveChannel(c:Channel):void{const id=this.selectedWorkspaceId();if(!id)return;this.channelService.unarchiveChannel(id,c.id).subscribe(x=>{this.archivedChannels.update(items=>items.filter(i=>i.id!==c.id));this.channels.update(items=>[...items,x]);});}
+  openPinnedMessages():void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;this.showPinnedMessages.set(true);this.messageService.pins(w,c.id).subscribe(x=>this.pinnedMessages.set(x));}
+  togglePin(message:Message):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;const request:Observable<unknown>=message.pinned?this.messageService.unpin(w,c.id,message.id):this.messageService.pin(w,c.id,message.id);request.subscribe(()=>{this.messages.update(items=>items.map(x=>x.id===message.id?{...x,pinned:!x.pinned}:x));if(this.showPinnedMessages())this.openPinnedMessages();});}
 
   openConversation(id: number, navigate = true): void {
     if (this.selectedConversation()?.id === id && !navigate) return;
@@ -549,7 +559,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
             this.upsertConversationMessage(event.message);
             if (event.type === 'CREATED') this.markConversationRead(id);
           }
-        }, () => { if (this.selectedConversation()?.id === id) { this.refreshSelectedConversation(id); if (this.showGroupMembersModal()) this.loadGroupMembers(id); } });
+        }, event => { if (this.selectedConversation()?.id === id) { this.refreshSelectedConversation(id); if(event.type==='READ_UPDATED')this.refreshReceipts(id); if (this.showGroupMembersModal()) this.loadGroupMembers(id); } });
         this.loadConversationHistory(id);
         this.markConversationRead(id);
         if (navigate) void this.router.navigate(['/conversations', id]);
@@ -633,6 +643,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       error: error => { this.confirmingGroupLeave.set(false); this.handleConversationActionError(error, 'Could not leave group.'); },
     });
   }
+  transferGroupCreator():void{const c=this.selectedConversation(),target=this.creatorTransferTarget();if(!c||!target)return;this.conversationService.transferCreator(c.id,target.userId).subscribe(x=>{this.upsertConversation(x);this.creatorTransferTarget.set(null);this.loadGroupMembers(c.id);});}
   openRenameConversation(): void {
     const conversation = this.selectedConversation(); if (!conversation || conversation.type !== 'GROUP') return;
     this.renameConversationForm.reset({ name: conversation.customName ?? '' });
@@ -691,6 +702,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         page.messages.forEach(message => merged.set(message.id, message));
         this.conversationMessages.set([...merged.values()].sort((a, b) => a.id - b.id));
         this.conversationCursor.set(page.nextBefore); this.conversationLoading.set(false);
+        this.refreshReceipts(id);
       },
       error: () => { this.conversationError.set('Could not load messages.'); this.conversationLoading.set(false); },
     });
@@ -746,6 +758,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   private refreshSelectedConversation(id: number): void {
     this.conversationService.get(id).subscribe({ next: conversation => this.upsertConversation(conversation), error: () => undefined });
   }
+  private refreshReceipts(id:number):void{for(const m of this.conversationMessages().filter(x=>x.senderId===this.currentUser()?.id)){this.conversationService.receipt(id,m.id).subscribe(r=>this.conversationReceipts.update(v=>({...v,[m.id]:r.readCount>0?(r.totalEligibleReaders===1?'Seen':`Seen by ${r.readCount}`):'Sent'})));}}
 
   createChannel(): void {
     const workspaceId = this.selectedWorkspaceId();

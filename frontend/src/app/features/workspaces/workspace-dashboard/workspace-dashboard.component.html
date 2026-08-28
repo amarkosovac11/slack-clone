@@ -216,6 +216,8 @@
       <span>Direct messages</span>
       <button type="button" title="Start a new message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()">+</button>
     </div>
+    <button type="button" class="channel-item" (click)="openHiddenConversations()"><span class="channel-name">Hidden conversations</span></button>
+    @if(selectedWorkspaceRole()==='OWNER'||selectedWorkspaceRole()==='ADMIN'){<button type="button" class="channel-item" (click)="openArchivedChannels()"><span class="channel-name">Archived channels</span></button>}
     @if (conversationsLoading()) { <div class="channel-state">Loading direct messages...</div> }
     <div class="channel-list">
       @for (conversation of conversations(); track conversation.id) {
@@ -274,6 +276,8 @@
                   <div class="inline-edit-actions"><button type="button" [disabled]="conversationActionLoading()" (click)="cancelEditingConversationMessage()">Cancel</button><button type="submit" [disabled]="conversationActionLoading()">Save</button></div>
                 </form>
               } @else { <p class="message-text">{{ message.content }} @if (message.updatedAt !== message.createdAt) { <small class="edited-label">(edited)</small> }</p> }
+              @if(message.mentions.length){<div class="mention-list">@for(mention of message.mentions;track mention.userId){<span class="mention-chip">&#64;{{mention.handle}}</span>}</div>}
+              @if(message.senderId===currentUser()?.id){<small class="receipt-label">{{conversationReceipts()[message.id] || 'Sent'}}</small>}
               </div>
               @if (!message.deletedAt && message.senderId === currentUser()?.id && editingConversationMessageId() !== message.id) {
                 <div class="message-actions"><button type="button" (click)="startEditingConversationMessage(message)">Edit</button><button type="button" class="message-delete-button" (click)="conversationMessagePendingDelete.set(message)">Delete</button></div>
@@ -331,6 +335,7 @@
         <span class="public-badge">Public</span>
       </div>
       }
+      <button type="button" class="secondary-button" (click)="openPinnedMessages()">Pinned messages</button>
 
     </header>
 
@@ -393,6 +398,7 @@
               </form>
             } @else {
               <p class="message-text">{{ message.content }} @if (isEdited(message)) { <small class="edited-label">(edited)</small> }</p>
+              @if(message.mentions.length){<div class="mention-list">@for(mention of message.mentions;track mention.userId){<span class="mention-chip">&#64;{{mention.handle}}</span>}</div>}
             }
           </div>
           @if (!message.deletedAt && message.senderId === currentUser()?.id && editingMessageId() !== message.id) {
@@ -401,6 +407,7 @@
               <button type="button" class="message-delete-button" (click)="requestMessageDelete(message)">Delete</button>
             </div>
           }
+          @if(!message.deletedAt){<div class="message-actions"><button type="button" (click)="togglePin(message)">{{message.pinned?'Unpin':'Pin'}}</button></div>}
         </article>
         }
       </div>
@@ -408,7 +415,7 @@
 
     </div>
 
-    <form
+      <form
       class="message-composer"
       [formGroup]="messageForm"
       (ngSubmit)="sendMessage()"
@@ -853,7 +860,7 @@
           <section class="members-section"><div class="members-section-heading"><h3>Members</h3><span>{{ groupMembers().length }}</span></div>
             <div class="member-list">@for (member of groupMembers(); track member.userId) {
               <div class="member-row"><span class="member-avatar">{{ member.displayName.charAt(0).toUpperCase() }}</span><div class="member-info"><div class="member-name-row"><span class="member-name">{{ member.displayName }}</span><span [class]="member.role === 'CREATOR' ? 'creator-badge' : 'member-role'">{{ member.role === 'CREATOR' ? 'Creator' : 'Member' }}</span></div><span class="member-email">Joined {{ member.joinedAt | date:'mediumDate' }}</span></div>
-                @if (currentUserIsGroupCreator() && member.role !== 'CREATOR') { <button type="button" class="remove-member-button" (click)="requestRemoveGroupMember(member)">Remove</button> }
+                @if (currentUserIsGroupCreator() && member.role !== 'CREATOR') { <button type="button" class="secondary-button" (click)="creatorTransferTarget.set(member)">Make creator</button><button type="button" class="remove-member-button" (click)="requestRemoveGroupMember(member)">Remove</button> }
               </div>
             }</div>
           </section>
@@ -870,6 +877,10 @@
     </section>
   </div>
 }
+@if(creatorTransferTarget();as member){<div class="modal-backdrop nested-modal"><section class="message-delete-dialog"><h2>Make {{member.displayName}} creator?</h2><p>You will become a regular participant and can then leave the group.</p><div class="modal-actions"><button type="button" (click)="creatorTransferTarget.set(null)">Cancel</button><button type="button" class="primary-button" (click)="transferGroupCreator()">Transfer creator</button></div></section></div>}
+@if(showHiddenConversations()){<div class="modal-backdrop" (click)="showHiddenConversations.set(false)"><section class="message-delete-dialog" (click)="$event.stopPropagation()"><h2>Hidden conversations</h2>@if(hiddenConversations().length===0){<p>No hidden conversations.</p>}@for(c of hiddenConversations();track c.id){<div class="member-row"><strong>{{c.displayName}}</strong><button type="button" (click)="restoreConversation(c)">Restore</button></div>}</section></div>}
+@if(showArchivedChannels()){<div class="modal-backdrop" (click)="showArchivedChannels.set(false)"><section class="message-delete-dialog" (click)="$event.stopPropagation()"><h2>Archived channels</h2>@if(archivedChannels().length===0){<p>No archived channels.</p>}@for(c of archivedChannels();track c.id){<div class="member-row"><strong>#{{c.name}}</strong><button type="button" (click)="unarchiveChannel(c)">Unarchive</button></div>}</section></div>}
+@if(showPinnedMessages()){<div class="modal-backdrop" (click)="showPinnedMessages.set(false)"><section class="message-delete-dialog" (click)="$event.stopPropagation()"><h2>Pinned messages</h2>@if(pinnedMessages().length===0){<p>No pinned messages.</p>}@for(pin of pinnedMessages();track pin.message.id){<div class="member-row"><div><strong>{{pin.message.senderDisplayName}}</strong><p>{{pin.message.content}}</p><small>Pinned by {{pin.pinnedByDisplayName}} · {{pin.pinnedAt|date:'short'}}</small></div><button type="button" (click)="togglePin(pin.message)">Unpin</button></div>}</section></div>}
 
 @if (groupMemberPendingRemove(); as member) {
   <div class="modal-backdrop nested-modal" role="presentation" (click)="groupMemberPendingRemove.set(null)"><section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()"><h2>Remove {{ member.displayName }}?</h2><p>They will lose access and will no longer receive new messages.</p><div class="modal-actions"><button type="button" class="secondary-button" (click)="groupMemberPendingRemove.set(null)">Cancel</button><button type="button" class="delete-channel-button" (click)="confirmRemoveGroupMember()">Remove</button></div></section></div>

@@ -15,6 +15,7 @@ public class ConversationController {
     private final ConversationService service;
     public ConversationController(ConversationService service) { this.service = service; }
     @GetMapping public List<ConversationResponse> list(Authentication auth) { return service.list(auth.getName()); }
+    @GetMapping("/hidden") public List<ConversationResponse> hidden(Authentication auth){return service.hidden(auth.getName());}
     @GetMapping("/eligible-users") public List<ConversationUserResponse> eligible(Authentication auth) { return service.eligibleUsers(auth.getName()); }
     @PostMapping("/direct")
     public ConversationResponse direct(@Valid @RequestBody StartDirectConversationRequest request, Authentication auth) {
@@ -59,6 +60,9 @@ public class ConversationController {
     }
     @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void hide(@PathVariable Long id, Authentication auth) { service.hide(id, auth.getName()); }
+    @PostMapping("/{id}/restore") public ConversationResponse restore(@PathVariable Long id,Authentication auth){return service.restore(id,auth.getName());}
+    @PostMapping("/{id}/transfer-creator") public ConversationResponse transferCreator(@PathVariable Long id,@Valid @RequestBody TransferConversationCreatorRequest request,Authentication auth){return service.transferCreator(id,request,auth.getName());}
+    @GetMapping("/{id}/messages/{messageId}/receipt") public ConversationReadReceiptResponse receipt(@PathVariable Long id,@PathVariable Long messageId,Authentication auth){return service.receipt(id,messageId,auth.getName());}
     @PatchMapping("/{id}/messages/{messageId}")
     public ConversationMessageResponse editMessage(@PathVariable Long id, @PathVariable Long messageId,
             @Valid @RequestBody UpdateConversationMessageRequest request, Authentication auth) {

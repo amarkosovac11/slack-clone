@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface ChannelRepository extends JpaRepository<Channel, Long> {
 
     List<Channel> findAllByWorkspaceIdOrderByCreatedAtAsc(Long workspaceId);
+    List<Channel> findAllByWorkspaceIdAndArchivedAtIsNotNullOrderByArchivedAtDesc(Long workspaceId);
 
     Optional<Channel> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
