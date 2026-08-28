@@ -1,6 +1,7 @@
 package com.amar.slackclone.config;
 
 import com.amar.slackclone.channel.ChannelAccessService;
+import com.amar.slackclone.conversation.ConversationAccessService;
 import com.amar.slackclone.security.JwtService;
 import com.amar.slackclone.user.User;
 import com.amar.slackclone.user.UserRepository;
@@ -23,19 +24,25 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
     private static final Pattern CHANNEL_TOPIC = Pattern.compile(
         "^/topic/workspaces/(\\d+)/channels/(\\d+)/messages$"
     );
+    private static final Pattern CONVERSATION_TOPIC = Pattern.compile("^/topic/conversations/(\\d+)/messages$");
+    private static final Pattern USER_CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
+    private static final Pattern CONVERSATION_SEND = Pattern.compile("^/app/conversations/(\\d+)/messages$");
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final ChannelAccessService channelAccessService;
+    private final ConversationAccessService conversationAccessService;
 
     public WebSocketSecurityInterceptor(
         JwtService jwtService,
         UserRepository userRepository,
-        ChannelAccessService channelAccessService
+        ChannelAccessService channelAccessService,
+        ConversationAccessService conversationAccessService
     ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.channelAccessService = channelAccessService;
+        this.conversationAccessService = conversationAccessService;
     }
 
     @Override
@@ -54,7 +61,7 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             authorizeSubscription(accessor);
         } else if (StompCommand.SEND.equals(accessor.getCommand())) {
-            throw new IllegalArgumentException("Sending messages over STOMP is not allowed");
+            authorizeSend(accessor);
         }
 
         return message;
@@ -89,15 +96,27 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
         }
 
         String destination = accessor.getDestination();
-        Matcher matcher = CHANNEL_TOPIC.matcher(destination == null ? "" : destination);
-        if (!matcher.matches()) {
-            throw new IllegalArgumentException("WebSocket subscription destination is not allowed");
+        String safeDestination = destination == null ? "" : destination;
+        Matcher matcher = CHANNEL_TOPIC.matcher(safeDestination);
+        if (matcher.matches()) {
+            channelAccessService.validateChannelAccess(Long.valueOf(matcher.group(1)), Long.valueOf(matcher.group(2)), accessor.getUser().getName());
+            return;
         }
+        matcher = CONVERSATION_TOPIC.matcher(safeDestination);
+        if (matcher.matches()) { conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)), accessor.getUser().getName()); return; }
+        matcher = USER_CONVERSATION_TOPIC.matcher(safeDestination);
+        if (matcher.matches()) {
+            var user = conversationAccessService.requireUser(accessor.getUser().getName());
+            if (!user.getId().equals(Long.valueOf(matcher.group(1)))) throw new IllegalArgumentException("Cannot subscribe to another user's updates");
+            return;
+        }
+        throw new IllegalArgumentException("WebSocket subscription destination is not allowed");
+    }
 
-        channelAccessService.validateChannelAccess(
-            Long.valueOf(matcher.group(1)),
-            Long.valueOf(matcher.group(2)),
-            accessor.getUser().getName()
-        );
+    private void authorizeSend(StompHeaderAccessor accessor) {
+        if (accessor.getUser() == null) throw new IllegalArgumentException("Unauthenticated WebSocket send");
+        Matcher matcher = CONVERSATION_SEND.matcher(accessor.getDestination() == null ? "" : accessor.getDestination());
+        if (!matcher.matches()) throw new IllegalArgumentException("WebSocket send destination is not allowed");
+        conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)), accessor.getUser().getName());
     }
 }

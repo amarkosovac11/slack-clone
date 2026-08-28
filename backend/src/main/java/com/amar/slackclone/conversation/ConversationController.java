@@ -1,0 +1,40 @@
+package com.amar.slackclone.conversation;
+
+import com.amar.slackclone.conversation.dto.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController @Validated @RequestMapping("/api/conversations")
+public class ConversationController {
+    private final ConversationService service;
+    public ConversationController(ConversationService service) { this.service = service; }
+    @GetMapping public List<ConversationResponse> list(Authentication auth) { return service.list(auth.getName()); }
+    @GetMapping("/eligible-users") public List<ConversationUserResponse> eligible(Authentication auth) { return service.eligibleUsers(auth.getName()); }
+    @PostMapping("/direct")
+    public ConversationResponse direct(@Valid @RequestBody StartDirectConversationRequest request, Authentication auth) {
+        return service.startDirect(request, auth.getName());
+    }
+    @PostMapping("/group") @ResponseStatus(HttpStatus.CREATED)
+    public ConversationResponse group(@Valid @RequestBody CreateGroupConversationRequest request, Authentication auth) {
+        return service.createGroup(request, auth.getName());
+    }
+    @GetMapping("/{id}") public ConversationResponse get(@PathVariable Long id, Authentication auth) { return service.get(id, auth.getName()); }
+    @GetMapping("/{id}/messages")
+    public ConversationMessagePageResponse history(@PathVariable Long id, @RequestParam(required = false) Long before,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(100) int limit, Authentication auth) {
+        return service.history(id, before, limit, auth.getName());
+    }
+    @PostMapping("/{id}/messages") @ResponseStatus(HttpStatus.CREATED)
+    public ConversationMessageResponse send(@PathVariable Long id, @Valid @RequestBody CreateConversationMessageRequest request, Authentication auth) {
+        return service.send(id, request, auth.getName());
+    }
+    @PostMapping("/{id}/read") public ConversationResponse read(@PathVariable Long id, Authentication auth) {
+        return service.markRead(id, auth.getName());
+    }
+}
