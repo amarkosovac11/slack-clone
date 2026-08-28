@@ -8,7 +8,11 @@ export interface Message {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  mentions: Mention[];
+  pinned: boolean;
 }
+export interface Mention { userId: number; displayName: string; handle: string; }
+export interface PinnedMessage { message: Message; pinnedByUserId: number; pinnedByDisplayName: string; pinnedAt: string; }
 
 export interface CreateMessageRequest {
   content: string;

@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import {
   CreateMessageRequest,
   Message,
+  PinnedMessage,
   UpdateMessageRequest,
 } from './message.models';
 
@@ -52,4 +53,7 @@ export class MessageService {
       `${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}`,
     );
   }
+  pins(workspaceId:number,channelId:number):Observable<PinnedMessage[]>{return this.http.get<PinnedMessage[]>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/pins`);}
+  pin(workspaceId:number,channelId:number,messageId:number):Observable<PinnedMessage>{return this.http.post<PinnedMessage>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}/pin`,{});}
+  unpin(workspaceId:number,channelId:number,messageId:number):Observable<void>{return this.http.delete<void>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}/pin`);}
 }

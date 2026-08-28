@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, input, output, signal, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ApiErrorResponse } from '../../../core/auth/auth.models';
-import { WorkspaceResponse } from '../workspace.models';
+import { WorkspaceMember, WorkspaceResponse } from '../workspace.models';
 import { WorkspaceService } from '../workspace.service';
 import { WorkspaceMembersComponent } from '../workspace-members/workspace-members.component';
 
@@ -27,6 +27,7 @@ export class WorkspaceSettingsComponent {
   readonly successMessage = signal<string | null>(null);
   readonly confirmingDelete = signal(false);
   readonly confirmingLeave = signal(false);
+  readonly ownershipMembers=signal<WorkspaceMember[]>([]); readonly ownershipTarget=signal<WorkspaceMember|null>(null);
   readonly form = this.formBuilder.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
   });
@@ -40,6 +41,7 @@ export class WorkspaceSettingsComponent {
     this.confirmingDelete.set(false);
     this.confirmingLeave.set(false);
     this.isOpen.set(true);
+    if(this.workspace().currentUserRole==='OWNER')this.workspaceService.getWorkspaceMembers(this.workspace().id).subscribe(m=>this.ownershipMembers.set(m.filter(x=>x.userId!==this.currentUserId())));
   }
 
   close(): void {
@@ -78,6 +80,7 @@ export class WorkspaceSettingsComponent {
       error: error => this.handleError(error, 'Could not leave workspace.'),
     });
   }
+  transferOwnership():void{const target=this.ownershipTarget();if(!target)return;this.isSaving.set(true);this.workspaceService.transferOwnership(this.workspace().id,target.userId).subscribe({next:w=>{this.workspaceUpdated.emit(w);this.ownershipTarget.set(null);this.isSaving.set(false);this.successMessage.set(`Ownership transferred to ${target.displayName}. You are now an administrator.`);},error:e=>this.handleError(e,'Could not transfer ownership.')});}
 
   private handleError(error: HttpErrorResponse, fallback: string): void {
     this.errorMessage.set((error.error as ApiErrorResponse | undefined)?.message ?? fallback);

@@ -81,6 +81,8 @@ export class ChannelService {
       `${this.apiUrl}/${workspaceId}/channels/${channelId}/archive`, {}
     );
   }
+  archivedChannels(workspaceId:number):Observable<Channel[]>{return this.http.get<Channel[]>(`${this.apiUrl}/${workspaceId}/channels/archived`);}
+  unarchiveChannel(workspaceId:number,channelId:number):Observable<Channel>{return this.http.post<Channel>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/unarchive`,{});}
 
   deleteChannel(workspaceId: number, channelId: number): Observable<void> {
     return this.http.delete<void>(

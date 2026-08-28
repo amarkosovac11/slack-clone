@@ -35,6 +35,7 @@ export class WorkspaceService {
   leaveWorkspace(workspaceId: number): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/${workspaceId}/leave`, {});
   }
+  transferOwnership(workspaceId:number,newOwnerUserId:number):Observable<WorkspaceResponse>{return this.http.post<WorkspaceResponse>(`${this.apiUrl}/${workspaceId}/transfer-ownership`,{newOwnerUserId});}
 
   getWorkspaceMembers(workspaceId: number): Observable<WorkspaceMember[]> {
     return this.http.get<WorkspaceMember[]>(

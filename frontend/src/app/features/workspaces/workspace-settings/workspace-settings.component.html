@@ -20,6 +20,10 @@
         <app-workspace-members [workspaceId]="workspace().id" [workspaceName]="workspace().name"
           [currentUserRole]="workspace().currentUserRole" [currentUserId]="currentUserId()" />
       </section>
+      @if (workspace().currentUserRole === 'OWNER') { <section class="settings-section"><h3>Ownership</h3><p>Transfer ownership to an active member. You will become an administrator.</p>
+        @for(member of ownershipMembers();track member.userId){<button type="button" (click)="ownershipTarget.set(member)">Transfer ownership to {{member.displayName}}</button>}
+        @if(ownershipTarget();as target){<div class="confirmation"><strong>Transfer ownership of {{workspace().name}} to {{target.displayName}}?</strong><p>Only {{target.displayName}} will be able to delete the workspace or transfer ownership afterward.</p><button type="button" (click)="ownershipTarget.set(null)">Cancel</button><button type="button" [disabled]="isSaving()" (click)="transferOwnership()">Confirm transfer</button></div>}
+      </section> }
       @if (errorMessage()) { <div class="settings-error">{{ errorMessage() }}</div> }
       @if (successMessage()) { <div class="settings-success">{{ successMessage() }}</div> }
       @if (workspace().currentUserRole !== 'OWNER') {
