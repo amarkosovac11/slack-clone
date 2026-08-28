@@ -210,12 +210,18 @@
     }
 
     <div class="channel-divider"></div>
-    <div class="dm-heading"><span>Direct messages</span><button type="button" title="Start direct message" (click)="openStartConversationModal()">+</button></div>
+    <div class="dm-heading">
+      <span>Direct messages</span>
+      <button type="button" title="Start a new message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()">+</button>
+    </div>
     @if (conversationsLoading()) { <div class="channel-state">Loading direct messages...</div> }
     <div class="channel-list">
       @for (conversation of conversations(); track conversation.id) {
         <button type="button" class="channel-item dm-item" [class.active]="selectedConversation()?.id === conversation.id" (click)="openConversation(conversation.id)">
-          <span class="dm-avatar">{{ conversation.type === 'GROUP' ? '&#128101;' : conversation.displayName.charAt(0).toUpperCase() }}</span>
+          <span class="dm-avatar" aria-hidden="true">
+            @if (conversation.type === 'GROUP') { <span class="dm-group-icon">&#128101;</span> }
+            @else { {{ conversation.displayName.charAt(0).toUpperCase() }} }
+          </span>
           <span class="channel-name">{{ conversation.displayName }}</span>
           @if (conversation.unreadCount > 0) { <span class="unread-badge">{{ conversation.unreadCount }}</span> }
         </button>
@@ -226,7 +232,17 @@
   <main class="channel-content">
 
     @if (selectedConversation(); as conversation) {
-      <header class="channel-header"><div><h2>{{ conversation.displayName }}</h2><p>{{ conversation.type === 'DIRECT' ? 'Direct message' : conversation.participants.length + ' participants' }}</p></div></header>
+      <header class="channel-header conversation-header">
+        <div class="conversation-heading">
+          <span class="conversation-header-avatar" aria-hidden="true">
+            @if (conversation.type === 'GROUP') { &#128101; } @else { {{ conversation.displayName.charAt(0).toUpperCase() }} }
+          </span>
+          <div>
+            <h2>{{ conversation.displayName }}</h2>
+            <p>{{ conversation.type === 'DIRECT' ? 'Direct message' : conversation.participants.length + ' participants' }}</p>
+          </div>
+        </div>
+      </header>
       <div class="message-area">
         @if (conversationCursor() !== null) { <button type="button" class="load-older-button" [disabled]="conversationLoading()" (click)="loadOlderConversationMessages()">Load older messages</button> }
         @if (conversationError()) { <div class="messages-state messages-error">{{ conversationError() }}</div> }
@@ -234,14 +250,17 @@
         <div class="message-list">
           @for (message of conversationMessages(); track message.id) {
             <article class="message-row"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
-              <div class="message-meta"><span class="message-sender">{{ message.senderDisplayName }}</span><time class="message-time">{{ message.createdAt | date:'shortTime' }}</time></div>
+              <div class="message-meta"><span class="message-sender">{{ message.senderDisplayName }}</span><time class="message-time" [attr.datetime]="message.createdAt">{{ message.createdAt | date:'shortTime' }}</time></div>
               <p class="message-text">{{ message.content }}</p></div></article>
           }
         </div>
       </div>
       <form class="message-composer" [formGroup]="conversationMessageForm" (ngSubmit)="sendConversationMessage()">
-        <textarea formControlName="content" rows="2" maxlength="4000" [placeholder]="'Message ' + conversation.displayName"></textarea>
-        <div class="message-composer-footer"><span></span><button type="submit" [disabled]="conversationMessageForm.invalid">Send</button></div>
+        <textarea formControlName="content" rows="2" maxlength="4000" [placeholder]="'Message ' + conversation.displayName" aria-label="Direct message"></textarea>
+        <div class="message-composer-footer">
+          <small class="composer-hint">Press Send to share your message</small>
+          <button type="submit" [disabled]="conversationMessageForm.invalid">Send</button>
+        </div>
       </form>
     } @else if (selectedChannel()) {
 
@@ -446,7 +465,7 @@
         [disabled]="memberActionUserId() !== null"
         (click)="closeChannelMembersModal()"
       >
-        Ã—
+        &times;
       </button>
     </div>
 
@@ -762,19 +781,23 @@
 @if (showStartConversationModal()) {
   <div class="modal-backdrop" role="presentation" (click)="closeStartConversationModal()">
     <section class="create-channel-modal dm-modal" role="dialog" aria-modal="true" aria-labelledby="start-dm-title" (click)="$event.stopPropagation()">
-      <header class="modal-header"><div><h2 id="start-dm-title">New message</h2><p>Select one person for a DM or two or more for a group.</p></div>
+      <header class="modal-header"><div><h2 id="start-dm-title">New message</h2><p>Choose one person for a direct message, or select several people to start a group.</p></div>
         <button type="button" class="modal-close-button" [disabled]="conversationModalLoading()" (click)="closeStartConversationModal()">&times;</button></header>
       <div class="dm-user-list">
         @if (conversationModalLoading() && eligibleUsers().length === 0) { <div class="members-state">Loading people...</div> }
+        @else if (!conversationModalLoading() && eligibleUsers().length === 0) { <div class="members-state">No workspace members are available to message.</div> }
         @for (user of eligibleUsers(); track user.id) {
           <label class="dm-user-option"><input type="checkbox" [checked]="selectedConversationUserIds().includes(user.id)" (change)="toggleConversationUser(user.id)" />
             <span class="member-avatar">{{ user.displayName.charAt(0).toUpperCase() }}</span><span><strong>{{ user.displayName }}</strong><small>{{ user.email }}</small></span></label>
         }
       </div>
+      @if (selectedConversationUserIds().length > 0) {
+        <div class="dm-selection-summary">{{ selectedConversationUserIds().length }} {{ selectedConversationUserIds().length === 1 ? 'person' : 'people' }} selected</div>
+      }
       @if (conversationError()) { <div class="modal-error">{{ conversationError() }}</div> }
       <div class="modal-actions"><button type="button" class="secondary-button" (click)="closeStartConversationModal()">Cancel</button>
         <button type="button" class="primary-button" [disabled]="selectedConversationUserIds().length === 0 || conversationModalLoading()" (click)="createSelectedConversation()">
-          {{ selectedConversationUserIds().length === 1 ? 'Open direct message' : 'Create group' }}
+          {{ selectedConversationUserIds().length === 0 ? 'Select people' : selectedConversationUserIds().length === 1 ? 'Open message' : 'Create group' }}
         </button></div>
     </section>
   </div>
