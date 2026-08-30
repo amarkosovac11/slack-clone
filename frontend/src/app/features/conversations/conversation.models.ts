@@ -2,7 +2,7 @@ export type ConversationType = 'DIRECT' | 'GROUP';
 export interface ConversationUser { id: number; displayName: string; email: string; }
 export interface ConversationParticipant { userId: number; displayName: string; avatarUrl: string | null; joinedAt: string; role: 'CREATOR' | 'MEMBER'; }
 export interface ConversationMetadataEvent { type: 'PARTICIPANT_ADDED' | 'PARTICIPANT_REMOVED' | 'PARTICIPANT_LEFT' | 'CREATOR_TRANSFERRED' | 'READ_UPDATED'; conversationId: number; affectedUserId: number | null; }
-export interface ConversationMessage { id: number; conversationId: number; senderId: number; senderDisplayName: string; content: string | null; createdAt: string; updatedAt: string; deletedAt: string | null; mentions: {userId:number;displayName:string;handle:string}[]; }
+export interface ConversationMessage { id: number; conversationId: number; senderId: number; senderDisplayName: string; content: string | null; createdAt: string; updatedAt: string; deletedAt: string | null; mentions: {userId:number;displayName:string;handle:string}[];threadRootMessageId:number|null;replyCount:number;reactions:{emoji:string;count:number;reactedByCurrentUser:boolean;users:string[]}[];attachments:{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}[]; }
 export interface ConversationReadReceipt { messageId:number;readCount:number;totalEligibleReaders:number;readerNames:string[]; }
 export interface Conversation { id: number; type: ConversationType; participants: ConversationUser[]; customName: string | null; displayName: string; lastMessage: ConversationMessage | null; unreadCount: number; createdAt: string; updatedAt: string; }
 export interface ConversationMessagePage { messages: ConversationMessage[]; nextBefore: number | null; }

@@ -19,6 +19,11 @@ export class ConversationService {
   leave(id: number): Observable<void> { return this.http.post<void>(`${this.url}/${id}/leave`, {}); }
   transferCreator(id:number,newCreatorUserId:number):Observable<Conversation>{return this.http.post<Conversation>(`${this.url}/${id}/transfer-creator`,{newCreatorUserId});}
   receipt(id:number,messageId:number):Observable<ConversationReadReceipt>{return this.http.get<ConversationReadReceipt>(`${this.url}/${id}/messages/${messageId}/receipt`);}
+  react(id:number,messageId:number,emoji:string):Observable<ConversationMessage>{return this.http.post<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/reactions`,{emoji});}
+  unreact(id:number,messageId:number,emoji:string):Observable<ConversationMessage>{return this.http.delete<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);}
+  thread(id:number,messageId:number):Observable<ConversationMessage[]>{return this.http.get<ConversationMessage[]>(`${this.url}/${id}/messages/${messageId}/thread`);}
+  reply(id:number,messageId:number,content:string):Observable<ConversationMessage>{return this.http.post<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/replies`,{content});}
+  upload(messageId:number,file:File):Observable<{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}>{const data=new FormData();data.append('file',file);return this.http.post<{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}>(`http://localhost:8080/api/attachments/conversation/${messageId}`,data);}
   startDirect(userId: number): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/direct`, { userId }); }
   createGroup(participantIds: number[]): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/group`, { participantIds }); }
   history(id: number, before?: number, limit = 50): Observable<ConversationMessagePage> {

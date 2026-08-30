@@ -10,6 +10,7 @@ import { Message } from './message.models';
 export class MessageWebSocketService {
   private readonly client: Client;
   private subscription: StompSubscription | null = null;
+  private typingSubscription: StompSubscription | null = null;
   private pendingSubscription: (() => void) | null = null;
 
   readonly connected = signal(false);
@@ -43,6 +44,7 @@ export class MessageWebSocketService {
     workspaceId: number,
     channelId: number,
     callback: (message: Message) => void,
+    typingCallback?: (event: { userId: number; displayName: string; typing: boolean }) => void,
   ): void {
     this.unsubscribeFromChannel();
 
@@ -55,6 +57,12 @@ export class MessageWebSocketService {
         `/topic/workspaces/${workspaceId}/channels/${channelId}/messages`,
         (frame: IMessage) => callback(JSON.parse(frame.body) as Message),
       );
+      if (typingCallback) {
+        this.typingSubscription = this.client.subscribe(
+          `/topic/workspaces/${workspaceId}/channels/${channelId}/typing`,
+          frame => typingCallback(JSON.parse(frame.body)),
+        );
+      }
     };
 
     this.pendingSubscription = subscribe;
@@ -65,12 +73,18 @@ export class MessageWebSocketService {
     }
   }
 
+  sendTyping(workspaceId: number, channelId: number, typing: boolean): void {
+    if (this.client.connected) this.client.publish({ destination: `/app/workspaces/${workspaceId}/channels/${channelId}/typing`, body: JSON.stringify({ typing }) });
+  }
+
   unsubscribeFromChannel(): void {
     if (this.subscription && this.client.connected) {
       this.subscription.unsubscribe();
     }
 
     this.subscription = null;
+    this.typingSubscription?.unsubscribe();
+    this.typingSubscription = null;
     this.pendingSubscription = null;
   }
 

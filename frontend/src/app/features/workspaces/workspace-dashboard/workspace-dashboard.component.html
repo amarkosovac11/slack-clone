@@ -116,6 +116,14 @@
   </nav>
 
   <aside class="channel-sidebar">
+    <div class="global-search" [formGroup]="searchForm">
+      <input type="search" formControlName="query" placeholder="Search messages and people" aria-label="Search" (input)="onSearchInput()">
+      @if(searchOpen()) { <div class="search-results">
+        @if(searchLoading()){<p>Searching...</p>}
+        @for(hit of searchResults();track hit.type + hit.id){<button type="button" (click)="openSearchHit(hit)"><strong>{{hit.title}}</strong><span>{{hit.contextName}}</span><small>{{hit.snippet}}</small></button>}
+        @if(!searchLoading() && searchResults().length===0){<p>No accessible results found.</p>}
+      </div> }
+    </div>
 
     @if (selectedWorkspace()) {
 
@@ -277,6 +285,8 @@
                 </form>
               } @else { <p class="message-text">{{ message.content }} @if (message.updatedAt !== message.createdAt) { <small class="edited-label">(edited)</small> }</p> }
               @if(message.mentions.length){<div class="mention-list">@for(mention of message.mentions;track mention.userId){<span class="mention-chip">&#64;{{mention.handle}}</span>}</div>}
+              @for(attachment of message.attachments;track attachment.id){<a class="attachment-card" [href]="attachmentUrl(attachment.downloadUrl)" target="_blank">{{attachment.originalFileName}}</a>}
+              <div class="message-extras">@for(reaction of message.reactions;track reaction.emoji){<button type="button" [class.active]="reaction.reactedByCurrentUser" (click)="toggleConversationReaction(message,reaction.emoji)">{{reaction.emoji}} {{reaction.count}}</button>}<button type="button" (click)="toggleConversationReaction(message,'👍')">＋ 👍</button><button type="button" (click)="openConversationThread(message)">Thread @if(message.replyCount){({{message.replyCount}})}</button></div>
               @if(message.senderId===currentUser()?.id){<small class="receipt-label">{{conversationReceipts()[message.id] || 'Sent'}}</small>}
               </div>
               @if (!message.deletedAt && message.senderId === currentUser()?.id && editingConversationMessageId() !== message.id) {
@@ -287,9 +297,10 @@
         </div>
       </div>
       <form class="message-composer" [formGroup]="conversationMessageForm" (ngSubmit)="sendConversationMessage()">
-        <textarea formControlName="content" rows="2" maxlength="4000" [placeholder]="'Message ' + conversation.displayName" aria-label="Direct message"></textarea>
+        <textarea formControlName="content" rows="2" maxlength="4000" [placeholder]="'Message ' + conversation.displayName" aria-label="Direct message" (input)="onTyping('conversation')"></textarea>
+        @if(typingNames().length){<small class="typing-indicator">{{typingNames().join(', ')}} typing...</small>}
         <div class="message-composer-footer">
-          <small class="composer-hint">Press Send to share your message</small>
+          <label class="file-picker">Attach<input type="file" (change)="chooseFile($event)"></label><small>{{selectedFile()?.name}}</small>
           <button type="submit" [disabled]="conversationMessageForm.invalid">Send</button>
         </div>
       </form>
@@ -399,6 +410,8 @@
             } @else {
               <p class="message-text">{{ message.content }} @if (isEdited(message)) { <small class="edited-label">(edited)</small> }</p>
               @if(message.mentions.length){<div class="mention-list">@for(mention of message.mentions;track mention.userId){<span class="mention-chip">&#64;{{mention.handle}}</span>}</div>}
+              @for(attachment of message.attachments;track attachment.id){@if(attachment.mimeType.startsWith('image/')){<a [href]="attachmentUrl(attachment.downloadUrl)" target="_blank"><img class="attachment-preview" [src]="attachmentUrl(attachment.downloadUrl)" [alt]="attachment.originalFileName"></a>}@else{<a class="attachment-card" [href]="attachmentUrl(attachment.downloadUrl)" target="_blank">{{attachment.originalFileName}}</a>}}
+              <div class="message-extras">@for(reaction of message.reactions;track reaction.emoji){<button type="button" [class.active]="reaction.reactedByCurrentUser" (click)="toggleChannelReaction(message,reaction.emoji)">{{reaction.emoji}} {{reaction.count}}</button>}<button type="button" (click)="toggleChannelReaction(message,'👍')">＋ 👍</button><button type="button" (click)="openChannelThread(message)">Thread @if(message.replyCount){({{message.replyCount}})}</button></div>
             }
           </div>
           @if (!message.deletedAt && message.senderId === currentUser()?.id && editingMessageId() !== message.id) {
@@ -426,10 +439,13 @@
         maxlength="4000"
         [placeholder]="'Message #' + selectedChannel()!.name"
         [disabled]="isSendingMessage()"
+        (input)="onTyping('channel')"
       ></textarea>
+      @if(typingNames().length){<small class="typing-indicator">{{typingNames().join(', ')}} typing...</small>}
 
       <div class="message-composer-footer">
         <div>
+          <label class="file-picker">Attach<input type="file" (change)="chooseFile($event)"></label><small>{{selectedFile()?.name}}</small>
           @if (
             messageForm.controls.content.touched &&
             messageForm.controls.content.hasError('required')
@@ -451,6 +467,8 @@
         </button>
       </div>
     </form>
+
+    @if(threadRootId()) { <aside class="thread-panel"><header><h3>Thread</h3><button type="button" (click)="closeThread()">×</button></header><div class="thread-messages">@for(reply of channelThread();track reply.id){<article><strong>{{reply.senderDisplayName}}</strong><p>{{reply.deletedAt?'Message deleted':reply.content}}</p></article>}@for(reply of conversationThread();track reply.id){<article><strong>{{reply.senderDisplayName}}</strong><p>{{reply.deletedAt?'Message deleted':reply.content}}</p></article>}</div><form [formGroup]="threadReplyForm" (ngSubmit)="sendThreadReply()"><textarea formControlName="content" placeholder="Reply in thread"></textarea><button type="submit" [disabled]="threadReplyForm.invalid">Reply</button></form></aside> }
 
     } @else {
 
