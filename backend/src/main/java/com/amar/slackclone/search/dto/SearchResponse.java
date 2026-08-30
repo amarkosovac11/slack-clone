@@ -1,0 +1,2 @@
+package com.amar.slackclone.search.dto;import java.time.OffsetDateTime;import java.util.List;
+public record SearchResponse(List<MessageResult> messages,List<ContextResult> channels,List<UserResult> users,List<ContextResult> conversations){public record MessageResult(Long id,String snippet,String sender,OffsetDateTime timestamp,String contextType,Long workspaceId,Long contextId,String contextName){}public record ContextResult(Long id,String name,String type,Long workspaceId){}public record UserResult(Long id,String displayName,String email){} }

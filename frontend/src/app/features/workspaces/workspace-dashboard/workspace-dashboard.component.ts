@@ -16,6 +16,7 @@ import { MessageWebSocketService } from '../../messages/message-websocket.servic
 import { Conversation, ConversationMessage, ConversationParticipant, ConversationUser } from '../../conversations/conversation.models';
 import { ConversationService } from '../../conversations/conversation.service';
 import { ConversationWebSocketService } from '../../conversations/conversation-websocket.service';
+import { SearchHit, SearchService } from '../../search/search.service';
 
 import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
 import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
@@ -133,6 +134,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly messageMutationError = signal<string | null>(null);
   readonly messagePendingDelete = signal<Message | null>(null);
   readonly webSocketConnected: MessageWebSocketService['connected'];
+  readonly searchResults=signal<SearchHit[]>([]); readonly searchOpen=signal(false); readonly searchLoading=signal(false);
+  readonly typingNames=signal<string[]>([]); readonly channelThread=signal<Message[]>([]); readonly conversationThread=signal<ConversationMessage[]>([]);
+  readonly threadRootId=signal<number|null>(null); readonly selectedFile=signal<File|null>(null);
+  private searchTimer:ReturnType<typeof setTimeout>|null=null; private typingTimer:ReturnType<typeof setTimeout>|null=null;
+  readonly searchForm=this.formBuilder.nonNullable.group({query:['']});
+  readonly threadReplyForm=this.formBuilder.nonNullable.group({content:['',[Validators.required,Validators.maxLength(4000)]]});
 
   readonly showCreateChannelModal = signal(false);
   readonly isCreatingChannel = signal(false);
@@ -223,6 +230,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     private readonly messageWebSocketService: MessageWebSocketService,
     private readonly conversationService: ConversationService,
     private readonly conversationWebSocketService: ConversationWebSocketService,
+    private readonly searchService:SearchService,
   ) {
     this.currentUser = this.authService.currentUser;
     this.webSocketConnected = this.messageWebSocketService.connected;
@@ -312,9 +320,23 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if(this.searchTimer)clearTimeout(this.searchTimer); if(this.typingTimer)clearTimeout(this.typingTimer);
     this.messageWebSocketService.disconnect();
     this.conversationWebSocketService.disconnect();
   }
+
+  onSearchInput():void{if(this.searchTimer)clearTimeout(this.searchTimer);const q=this.searchForm.getRawValue().query.trim();if(q.length<2){this.searchResults.set([]);this.searchOpen.set(false);return;}this.searchTimer=setTimeout(()=>{this.searchLoading.set(true);this.searchService.search(q,this.selectedWorkspaceId()).subscribe({next:r=>{this.searchResults.set(r.results);this.searchOpen.set(true);this.searchLoading.set(false);},error:()=>this.searchLoading.set(false)});},300);}
+  openSearchHit(hit:SearchHit):void{this.searchOpen.set(false);if(hit.channelId&&this.selectedWorkspaceId())void this.router.navigate(['/workspaces',this.selectedWorkspaceId(),'channels',hit.channelId]);else if(hit.conversationId)this.openConversation(hit.conversationId);}
+  chooseFile(event:Event):void{this.selectedFile.set((event.target as HTMLInputElement).files?.[0]??null);}
+  attachmentUrl(url:string):string{return url.startsWith('http')?url:`http://localhost:8080${url}`;}
+  toggleChannelReaction(message:Message,emoji:string):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;const own=message.reactions.find(r=>r.emoji===emoji)?.reactedByCurrentUser;const call=own?this.messageService.unreact(w,c.id,message.id,emoji):this.messageService.react(w,c.id,message.id,emoji);call.subscribe(updated=>this.upsertMessage(updated));}
+  toggleConversationReaction(message:ConversationMessage,emoji:string):void{const c=this.selectedConversation();if(!c)return;const own=message.reactions.find(r=>r.emoji===emoji)?.reactedByCurrentUser;const call=own?this.conversationService.unreact(c.id,message.id,emoji):this.conversationService.react(c.id,message.id,emoji);call.subscribe(updated=>this.upsertConversationMessage(updated));}
+  openChannelThread(message:Message):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;this.threadRootId.set(message.id);this.conversationThread.set([]);this.messageService.thread(w,c.id,message.id).subscribe(x=>this.channelThread.set(x));}
+  openConversationThread(message:ConversationMessage):void{const c=this.selectedConversation();if(!c)return;this.threadRootId.set(message.id);this.channelThread.set([]);this.conversationService.thread(c.id,message.id).subscribe(x=>this.conversationThread.set(x));}
+  closeThread():void{this.threadRootId.set(null);this.channelThread.set([]);this.conversationThread.set([]);this.threadReplyForm.reset({content:''});}
+  sendThreadReply():void{const root=this.threadRootId(),content=this.threadReplyForm.getRawValue().content.trim();if(!root||!content)return;const w=this.selectedWorkspaceId(),channel=this.selectedChannel(),conversation=this.selectedConversation();if(channel&&w)this.messageService.reply(w,channel.id,root,content).subscribe(m=>{this.channelThread.update(x=>[...x,m]);this.threadReplyForm.reset({content:''});});else if(conversation)this.conversationService.reply(conversation.id,root,content).subscribe(m=>{this.conversationThread.update(x=>[...x,m]);this.threadReplyForm.reset({content:''});});}
+  onTyping(kind:'channel'|'conversation'):void{if(kind==='channel'){const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(w&&c)this.messageWebSocketService.sendTyping(w,c.id,true);}else{const c=this.selectedConversation();if(c)this.conversationWebSocketService.sendTyping(c.id,true);}if(this.typingTimer)clearTimeout(this.typingTimer);this.typingTimer=setTimeout(()=>{const w=this.selectedWorkspaceId(),c=this.selectedChannel(),dm=this.selectedConversation();if(kind==='channel'&&w&&c)this.messageWebSocketService.sendTyping(w,c.id,false);if(kind==='conversation'&&dm)this.conversationWebSocketService.sendTyping(dm.id,false);},1500);}
+  private handleTyping(event:{userId:number;displayName:string;typing:boolean}):void{if(event.userId===this.currentUser()?.id)return;this.typingNames.update(names=>event.typing?[...new Set([...names,event.displayName])]:names.filter(n=>n!==event.displayName));}
 
   selectWorkspace(workspaceId: number): void {
     this.closeConversationSelection();
@@ -559,7 +581,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
             this.upsertConversationMessage(event.message);
             if (event.type === 'CREATED') this.markConversationRead(id);
           }
-        }, event => { if (this.selectedConversation()?.id === id) { this.refreshSelectedConversation(id); if(event.type==='READ_UPDATED')this.refreshReceipts(id); if (this.showGroupMembersModal()) this.loadGroupMembers(id); } });
+        }, event => { if (this.selectedConversation()?.id === id) { this.refreshSelectedConversation(id); if(event.type==='READ_UPDATED')this.refreshReceipts(id); if (this.showGroupMembersModal()) this.loadGroupMembers(id); } }, event=>this.handleTyping(event));
         this.loadConversationHistory(id);
         this.markConversationRead(id);
         if (navigate) void this.router.navigate(['/conversations', id]);
@@ -582,11 +604,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     const content = this.conversationMessageForm.getRawValue().content.trim();
     if (!content) return;
     this.conversationError.set(null);
-    if (this.conversationWebSocketService.send(conversation.id, content)) {
+    if (!this.selectedFile() && this.conversationWebSocketService.send(conversation.id, content)) {
       this.conversationMessageForm.reset({ content: '' }); return;
     }
     this.conversationService.send(conversation.id, content).subscribe({
-      next: message => { this.upsertConversationMessage(message); this.conversationMessageForm.reset({ content: '' }); },
+      next: message => { const file=this.selectedFile(); if(file)this.conversationService.upload(message.id,file).subscribe(a=>this.upsertConversationMessage({...message,attachments:[...message.attachments,a]}));else this.upsertConversationMessage(message);this.selectedFile.set(null); this.conversationMessageForm.reset({ content: '' }); },
       error: (error: HttpErrorResponse) => this.conversationError.set((error.error as ApiErrorResponse | undefined)?.message ?? 'Could not send message.'),
     });
   }
@@ -1129,9 +1151,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           this.selectedChannel()?.id === channelId &&
           message.channelId === channelId
         ) {
-          this.upsertMessage(message);
+          const file=this.selectedFile();
+          if(file)this.messageService.upload(message.id,file).subscribe(a=>this.upsertMessage({...message,attachments:[...message.attachments,a]}));else this.upsertMessage(message);
+          this.selectedFile.set(null);
         }
       },
+      event => this.handleTyping(event),
     );
 
     this.messages.set([]);

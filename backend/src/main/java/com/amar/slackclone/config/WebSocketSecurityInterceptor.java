@@ -22,11 +22,13 @@ import java.util.regex.Pattern;
 public class WebSocketSecurityInterceptor implements ChannelInterceptor {
 
     private static final Pattern CHANNEL_TOPIC = Pattern.compile(
-        "^/topic/workspaces/(\\d+)/channels/(\\d+)/messages$"
+        "^/topic/workspaces/(\\d+)/channels/(\\d+)/(?:messages|typing)$"
     );
-    private static final Pattern CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations/(\\d+)/(?:messages|metadata)$");
+    private static final Pattern CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations/(\\d+)/(?:messages|metadata|typing)$");
     private static final Pattern USER_CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
     private static final Pattern CONVERSATION_SEND = Pattern.compile("^/app/conversations/(\\d+)/messages$");
+    private static final Pattern CONVERSATION_TYPING_SEND=Pattern.compile("^/app/conversations/(\\d+)/typing$");
+    private static final Pattern CHANNEL_TYPING_SEND=Pattern.compile("^/app/workspaces/(\\d+)/channels/(\\d+)/typing$");
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
@@ -119,8 +121,7 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
 
     private void authorizeSend(StompHeaderAccessor accessor) {
         if (accessor.getUser() == null) throw new IllegalArgumentException("Unauthenticated WebSocket send");
-        Matcher matcher = CONVERSATION_SEND.matcher(accessor.getDestination() == null ? "" : accessor.getDestination());
-        if (!matcher.matches()) throw new IllegalArgumentException("WebSocket send destination is not allowed");
-        conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)), accessor.getUser().getName());
+        String destination=accessor.getDestination()==null?"":accessor.getDestination();Matcher matcher=CONVERSATION_SEND.matcher(destination);
+        if(matcher.matches()){conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)),accessor.getUser().getName());return;}matcher=CONVERSATION_TYPING_SEND.matcher(destination);if(matcher.matches()){conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)),accessor.getUser().getName());return;}matcher=CHANNEL_TYPING_SEND.matcher(destination);if(matcher.matches()){channelAccessService.validateChannelAccess(Long.valueOf(matcher.group(1)),Long.valueOf(matcher.group(2)),accessor.getUser().getName());return;}throw new IllegalArgumentException("WebSocket send destination is not allowed");
     }
 }

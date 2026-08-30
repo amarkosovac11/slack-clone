@@ -72,4 +72,8 @@ public class ConversationController {
     public ConversationMessageResponse deleteMessage(@PathVariable Long id, @PathVariable Long messageId, Authentication auth) {
         return service.deleteMessage(id, messageId, auth.getName());
     }
+    @PostMapping("/{id}/messages/{messageId}/reactions") public ConversationMessageResponse react(@PathVariable Long id,@PathVariable Long messageId,@Valid @RequestBody com.amar.slackclone.message.dto.ReactionRequest r,Authentication a){return service.addReaction(id,messageId,r.emoji(),a.getName());}
+    @DeleteMapping("/{id}/messages/{messageId}/reactions/{emoji}") public ConversationMessageResponse unreact(@PathVariable Long id,@PathVariable Long messageId,@PathVariable String emoji,Authentication a){return service.removeReaction(id,messageId,emoji,a.getName());}
+    @GetMapping("/{id}/messages/{messageId}/thread") public List<ConversationMessageResponse> thread(@PathVariable Long id,@PathVariable Long messageId,Authentication a){return service.thread(id,messageId,a.getName());}
+    @PostMapping("/{id}/messages/{messageId}/replies") @ResponseStatus(HttpStatus.CREATED) public ConversationMessageResponse reply(@PathVariable Long id,@PathVariable Long messageId,@Valid @RequestBody CreateConversationMessageRequest r,Authentication a){return service.reply(id,messageId,r,a.getName());}
 }

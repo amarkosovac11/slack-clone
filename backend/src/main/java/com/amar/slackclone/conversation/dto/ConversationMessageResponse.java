@@ -4,4 +4,5 @@ import java.util.List;
 import com.amar.slackclone.message.dto.MentionResponse;
 public record ConversationMessageResponse(Long id, Long conversationId, Long senderId,
         String senderDisplayName, String content, OffsetDateTime createdAt,
-        OffsetDateTime updatedAt, OffsetDateTime deletedAt, List<MentionResponse> mentions) {}
+        OffsetDateTime updatedAt, OffsetDateTime deletedAt, List<MentionResponse> mentions,Long threadRootMessageId,long replyCount,
+        List<com.amar.slackclone.message.dto.ReactionSummary> reactions,List<com.amar.slackclone.message.dto.AttachmentResponse> attachments) {}

@@ -14,6 +14,7 @@ public class ConversationMessage {
     @Column(name = "created_at", nullable = false) private OffsetDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private OffsetDateTime updatedAt;
     @Column(name = "deleted_at") private OffsetDateTime deletedAt;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="thread_root_message_id") private ConversationMessage threadRootMessage;
     @PrePersist void create() { var now = OffsetDateTime.now(); if (createdAt == null) createdAt = now; if (updatedAt == null) updatedAt = now; }
     public Long getId() { return id; }
     public Conversation getConversation() { return conversation; }
@@ -27,4 +28,5 @@ public class ConversationMessage {
     public OffsetDateTime getDeletedAt() { return deletedAt; }
     public void edit(String content) { this.content = content; this.updatedAt = OffsetDateTime.now(); }
     public void softDelete() { this.content = null; this.deletedAt = OffsetDateTime.now(); this.updatedAt = this.deletedAt; }
+    public ConversationMessage getThreadRootMessage(){return threadRootMessage;} public void setThreadRootMessage(ConversationMessage v){threadRootMessage=v;}
 }

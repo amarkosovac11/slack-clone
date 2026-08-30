@@ -10,7 +10,13 @@ export interface Message {
   deletedAt: string | null;
   mentions: Mention[];
   pinned: boolean;
+  threadRootMessageId: number | null;
+  replyCount: number;
+  reactions: ReactionSummary[];
+  attachments: Attachment[];
 }
+export interface ReactionSummary { emoji:string;count:number;reactedByCurrentUser:boolean;users:string[]; }
+export interface Attachment { id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string; }
 export interface Mention { userId: number; displayName: string; handle: string; }
 export interface PinnedMessage { message: Message; pinnedByUserId: number; pinnedByDisplayName: string; pinnedAt: string; }
 

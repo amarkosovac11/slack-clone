@@ -1,0 +1,129 @@
+package com.amar.slackclone.attachment;
+
+import com.amar.slackclone.channel.ChannelAccessService;
+import com.amar.slackclone.conversation.*;
+import com.amar.slackclone.message.*;
+import com.amar.slackclone.message.dto.AttachmentResponse;
+import com.amar.slackclone.user.UserRepository;
+import org.springframework.core.io.Resource;
+import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.*;
+import java.nio.file.Paths;
+
+@RestController
+@RequestMapping("/api/attachments")
+public class AttachmentController {
+    private final FileStorageService storage;
+    private final ChannelMessageAttachmentRepository channelAttachments;
+    private final ConversationMessageAttachmentRepository conversationAttachments;
+    private final MessageRepository messages;
+    private final ConversationMessageRepository conversationMessages;
+    private final ChannelAccessService channelAccess;
+    private final ConversationAccessService conversationAccess;
+    private final UserRepository users;
+
+    public AttachmentController(FileStorageService s, ChannelMessageAttachmentRepository ca,
+            ConversationMessageAttachmentRepository coa, MessageRepository m, ConversationMessageRepository cm,
+            ChannelAccessService ch, ConversationAccessService co, UserRepository u) {
+        storage = s;
+        channelAttachments = ca;
+        conversationAttachments = coa;
+        messages = m;
+        conversationMessages = cm;
+        channelAccess = ch;
+        conversationAccess = co;
+        users = u;
+    }
+
+    @PostMapping(value = "/channel/{messageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public AttachmentResponse uploadChannel(@PathVariable Long messageId, @RequestPart("file") MultipartFile file,
+            Authentication a) throws IOException {
+        Message m = messages.findById(messageId).orElseThrow(() -> new MessageNotFoundException(messageId));
+        channelAccess.validateChannelAccess(m.getChannel().getWorkspace().getId(), m.getChannel().getId(), a.getName());
+        if (m.getDeletedAt() != null)
+            throw new IllegalArgumentException("Deleted message cannot receive attachments");
+        ChannelMessageAttachment x = new ChannelMessageAttachment();
+        x.setMessage(m);
+        x.setUploadedBy(users.findByEmailIgnoreCase(a.getName()).orElseThrow());
+        fill(x, file, storage.store(file));
+        x = channelAttachments.save(x);
+        return dto(x);
+    }
+
+    @PostMapping(value = "/conversation/{messageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public AttachmentResponse uploadConversation(@PathVariable Long messageId, @RequestPart("file") MultipartFile file,
+            Authentication a) throws IOException {
+        ConversationMessage m = conversationMessages.findById(messageId).orElseThrow();
+        conversationAccess.requireParticipant(m.getConversation().getId(), a.getName());
+        if (m.getDeletedAt() != null)
+            throw new IllegalArgumentException("Deleted message cannot receive attachments");
+        ConversationMessageAttachment x = new ConversationMessageAttachment();
+        x.setMessage(m);
+        x.setUploadedBy(users.findByEmailIgnoreCase(a.getName()).orElseThrow());
+        fill(x, file, storage.store(file));
+        x = conversationAttachments.save(x);
+        return dto(x);
+    }
+
+    @GetMapping("/channel/{id}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<Resource> channel(@PathVariable Long id, Authentication a) {
+        ChannelMessageAttachment x = channelAttachments.findById(id).orElseThrow();
+        Message m = x.getMessage();
+        channelAccess.validateChannelAccess(m.getChannel().getWorkspace().getId(), m.getChannel().getId(), a.getName());
+        if (m.getDeletedAt() != null)
+            return ResponseEntity.notFound().build();
+        return file(x.getStorageKey(), x.getMimeType(), x.getOriginalFileName());
+    }
+
+    @GetMapping("/conversation/{id}")
+    @Transactional(readOnly = true)
+    public ResponseEntity<Resource> conversation(@PathVariable Long id, Authentication a) {
+        ConversationMessageAttachment x = conversationAttachments.findById(id).orElseThrow();
+        ConversationMessage m = x.getMessage();
+        conversationAccess.requireParticipant(m.getConversation().getId(), a.getName());
+        if (m.getDeletedAt() != null)
+            return ResponseEntity.notFound().build();
+        return file(x.getStorageKey(), x.getMimeType(), x.getOriginalFileName());
+    }
+
+    private void fill(ChannelMessageAttachment x, MultipartFile f, String k) {
+        x.setOriginalFileName(safe(f.getOriginalFilename()));
+        x.setStorageKey(k);
+        x.setMimeType(f.getContentType());
+        x.setFileSize(f.getSize());
+    }
+
+    private void fill(ConversationMessageAttachment x, MultipartFile f, String k) {
+        x.setOriginalFileName(safe(f.getOriginalFilename()));
+        x.setStorageKey(k);
+        x.setMimeType(f.getContentType());
+        x.setFileSize(f.getSize());
+    }
+
+    private String safe(String n) {
+        return Paths.get(n == null ? "file" : n).getFileName().toString().replaceAll("[\\r\\n]", "_");
+    }
+
+    private AttachmentResponse dto(ChannelMessageAttachment x) {
+        return new AttachmentResponse(x.getId(), x.getOriginalFileName(), x.getMimeType(), x.getFileSize(),
+                "/api/attachments/channel/" + x.getId());
+    }
+
+    private AttachmentResponse dto(ConversationMessageAttachment x) {
+        return new AttachmentResponse(x.getId(), x.getOriginalFileName(), x.getMimeType(), x.getFileSize(),
+                "/api/attachments/conversation/" + x.getId());
+    }
+
+    private ResponseEntity<Resource> file(String k, String mime, String name) {
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(mime))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safe(name) + "\"")
+                .body(storage.load(k));
+    }
+}
