@@ -1,0 +1,1 @@
+package com.amar.slackclone.typing;import java.time.OffsetDateTime;public record TypingEvent(String contextType,Long contextId,Long userId,String displayName,boolean typing,OffsetDateTime timestamp){}

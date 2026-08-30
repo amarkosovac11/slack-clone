@@ -29,19 +29,21 @@ public class MessageService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ChannelPinnedMessageRepository pins; private final ChannelMessageMentionRepository mentions;
     private final WorkspaceMemberRepository workspaceMembers; private final ChannelMemberRepository channelMembers;
+    private final ChannelMessageReactionRepository reactions; private final ChannelMessageAttachmentRepository attachments;
 
     public MessageService(
         MessageRepository messageRepository,
         ChannelAccessService channelAccessService,
         UserRepository userRepository,
         SimpMessagingTemplate messagingTemplate, ChannelPinnedMessageRepository pins, ChannelMessageMentionRepository mentions,
-        WorkspaceMemberRepository workspaceMembers, ChannelMemberRepository channelMembers
+        WorkspaceMemberRepository workspaceMembers, ChannelMemberRepository channelMembers,ChannelMessageReactionRepository reactions,ChannelMessageAttachmentRepository attachments
     ) {
         this.messageRepository = messageRepository;
         this.channelAccessService = channelAccessService;
         this.userRepository = userRepository;
         this.messagingTemplate = messagingTemplate;
         this.pins=pins;this.mentions=mentions;this.workspaceMembers=workspaceMembers;this.channelMembers=channelMembers;
+        this.reactions=reactions;this.attachments=attachments;
     }
 
     @Transactional(readOnly = true)
@@ -59,7 +61,7 @@ public class MessageService {
         return messageRepository
             .findAllByChannelIdOrderByCreatedAtAsc(channelId)
             .stream()
-            .map(this::toMessageResponse)
+            .map(message -> toMessageResponse(message, getAuthenticatedUser(authenticatedEmail).getId()))
             .toList();
     }
 
@@ -158,7 +160,8 @@ public class MessageService {
             .orElseThrow(AuthenticatedUserNotFoundException::new);
     }
 
-    private MessageResponse toMessageResponse(Message message) {
+    private MessageResponse toMessageResponse(Message message) { return toMessageResponse(message,null); }
+    private MessageResponse toMessageResponse(Message message,Long viewerId) {
         return new MessageResponse(
             message.getId(),
             message.getChannel().getId(),
@@ -169,9 +172,15 @@ public class MessageService {
             message.getCreatedAt(),
             message.getUpdatedAt(),
             message.getDeletedAt(), mentions.findAllByMessageId(message.getId()).stream().map(x->mentionResponse(x.getUser())).toList(),
-            pins.existsById(message.getId())
+            pins.existsById(message.getId()),message.getThreadRootMessage()==null?null:message.getThreadRootMessage().getId(),messageRepository.countByThreadRootMessageId(message.getId()),reactionSummaries(message.getId(),viewerId),attachmentResponses(message.getId())
         );
     }
+    @Transactional public MessageResponse addReaction(Long workspaceId,Long channelId,Long messageId,String emoji,String email){channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message m=requireMessage(channelId,messageId);requireNotDeleted(m);User u=getAuthenticatedUser(email);reactions.findByMessageIdAndUserIdAndEmoji(messageId,u.getId(),emoji).orElseGet(()->reactions.save(new ChannelMessageReaction(m,u,emoji)));MessageResponse r=toMessageResponse(m,u.getId());broadcastAfterCommit(workspaceId,channelId,r);return r;}
+    @Transactional public MessageResponse removeReaction(Long workspaceId,Long channelId,Long messageId,String emoji,String email){channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message m=requireMessage(channelId,messageId);User u=getAuthenticatedUser(email);reactions.findByMessageIdAndUserIdAndEmoji(messageId,u.getId(),emoji).ifPresent(reactions::delete);MessageResponse r=toMessageResponse(m,u.getId());broadcastAfterCommit(workspaceId,channelId,r);return r;}
+    @Transactional(readOnly=true) public List<MessageResponse> thread(Long workspaceId,Long channelId,Long messageId,String email){channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message root=requireMessage(channelId,messageId);if(root.getThreadRootMessage()!=null)root=root.getThreadRootMessage();List<MessageResponse> out=new ArrayList<>();out.add(toMessageResponse(root));out.addAll(messageRepository.findAllByThreadRootMessageIdOrderByCreatedAtAsc(root.getId()).stream().map(this::toMessageResponse).toList());return out;}
+    @Transactional public MessageResponse reply(Long workspaceId,Long channelId,Long messageId,CreateMessageRequest request,String email){Channel c=channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message target=requireMessage(channelId,messageId);Message root=target.getThreadRootMessage()==null?target:target.getThreadRootMessage();Message reply=new Message();reply.setChannel(c);reply.setSender(getAuthenticatedUser(email));reply.setContent(request.content().trim());reply.setThreadRootMessage(root);reply=messageRepository.saveAndFlush(reply);persistMentions(reply);MessageResponse rr=toMessageResponse(reply);broadcastAfterCommit(workspaceId,channelId,toMessageResponse(root));return rr;}
+    private List<ReactionSummary> reactionSummaries(Long id,Long viewer){return reactions.findAllByMessageId(id).stream().collect(java.util.stream.Collectors.groupingBy(ChannelMessageReaction::getEmoji)).entrySet().stream().map(e->new ReactionSummary(e.getKey(),e.getValue().size(),viewer!=null&&e.getValue().stream().anyMatch(x->x.getUser().getId().equals(viewer)),e.getValue().stream().limit(20).map(x->x.getUser().getDisplayName()).toList())).toList();}
+    private List<AttachmentResponse> attachmentResponses(Long id){return attachments.findAllByMessageId(id).stream().map(a->new AttachmentResponse(a.getId(),a.getOriginalFileName(),a.getMimeType(),a.getFileSize(),"/api/attachments/channel/"+a.getId())).toList();}
     @Transactional public PinnedMessageResponse pin(Long workspaceId,Long channelId,Long messageId,String email){Channel c=channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message m=requireMessage(channelId,messageId);requireNotDeleted(m);User u=getAuthenticatedUser(email);ChannelPinnedMessage p=pins.findById(messageId).orElseGet(ChannelPinnedMessage::new);p.setMessage(m);p.setChannel(c);p.setPinnedBy(u);p=pins.save(p);return pinResponse(p);}
     @Transactional public void unpin(Long workspaceId,Long channelId,Long messageId,String email){channelAccessService.validateChannelAccess(workspaceId,channelId,email);ChannelPinnedMessage p=pins.findByMessageIdAndChannelId(messageId,channelId).orElseThrow(()->new MessageNotFoundException(messageId));pins.delete(p);}
     @Transactional(readOnly=true) public List<PinnedMessageResponse> pins(Long workspaceId,Long channelId,String email){channelAccessService.validateChannelAccess(workspaceId,channelId,email);return pins.findAllByChannelIdOrderByPinnedAtDesc(channelId).stream().map(this::pinResponse).toList();}

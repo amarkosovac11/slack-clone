@@ -18,7 +18,11 @@ public record MessageResponse(
     OffsetDateTime updatedAt,
     OffsetDateTime deletedAt,
     List<MentionResponse> mentions,
-    boolean pinned
+    boolean pinned,
+    Long threadRootMessageId,
+    long replyCount,
+    java.util.List<ReactionSummary> reactions,
+    java.util.List<AttachmentResponse> attachments
 
 ) {
 }

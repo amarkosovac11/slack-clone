@@ -1,0 +1,2 @@
+package com.amar.slackclone.conversation;import org.springframework.data.jpa.repository.*;import java.util.*;
+public interface ConversationMessageReactionRepository extends JpaRepository<ConversationMessageReaction,Long>{@EntityGraph(attributePaths="user")List<ConversationMessageReaction> findAllByMessageId(Long id);Optional<ConversationMessageReaction> findByMessageIdAndUserIdAndEmoji(Long m,Long u,String e);}

@@ -33,6 +33,7 @@ public class Message {
 
     @Column(name = "deleted_at")
     private OffsetDateTime deletedAt;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="thread_root_message_id") private Message threadRootMessage;
 
     @PrePersist
     void onCreate() {
@@ -97,4 +98,5 @@ public class Message {
     }
 
     public void markUpdated() { this.updatedAt = OffsetDateTime.now(); }
+    public Message getThreadRootMessage(){return threadRootMessage;} public void setThreadRootMessage(Message v){threadRootMessage=v;}
 }

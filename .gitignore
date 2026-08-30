@@ -61,6 +61,7 @@ frontend/pnpm-debug.log*
 # Local files and uploads
 # =========================
 uploads/
+backend/uploads/
 tmp/
 temp/
 
