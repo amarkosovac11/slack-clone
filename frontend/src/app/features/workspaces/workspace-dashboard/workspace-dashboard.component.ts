@@ -639,9 +639,19 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   toggleConversationMenu(): void { this.showConversationMenu.update(open => !open); }
   openGroupMembers(): void {
     const conversation = this.selectedConversation(); if (!conversation || conversation.type !== 'GROUP') return;
-    this.showConversationMenu.set(false); this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
+    // Conversation dialogs use separate signals, so clear any stale dialog state
+    // before opening this one. Otherwise two modal backdrops can be rendered at once.
+    this.showConversationMenu.set(false); this.showRenameConversationModal.set(false);
+    this.confirmingGroupLeave.set(false); this.confirmingConversationHide.set(false);
+    this.groupMemberPendingRemove.set(null); this.creatorTransferTarget.set(null);
+    this.conversationMessagePendingDelete.set(null);
+    this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
   }
-  closeGroupMembers(): void { if (!this.groupMembersLoading() && this.groupMemberActionUserId() === null) this.showGroupMembersModal.set(false); }
+  closeGroupMembers(): void {
+    if (this.groupMembersLoading() || this.groupMemberActionUserId() !== null) return;
+    this.showGroupMembersModal.set(false); this.groupMemberPendingRemove.set(null);
+    this.creatorTransferTarget.set(null); this.confirmingGroupLeave.set(false);
+  }
   toggleGroupUser(userId: number): void { this.selectedGroupUserIds.update(ids => ids.includes(userId) ? ids.filter(id => id !== userId) : [...ids, userId]); }
   addSelectedGroupUsers(): void {
     const conversation = this.selectedConversation(); const ids = this.selectedGroupUserIds(); if (!conversation || ids.length === 0) return;
