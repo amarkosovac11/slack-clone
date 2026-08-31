@@ -15,6 +15,7 @@ import { TokenService } from './token.service';
 })
 export class AuthService {
   private readonly apiUrl = 'http://localhost:8080/api/auth';
+  private readonly usersUrl = 'http://localhost:8080/api/users';
 
   readonly currentUser = signal<UserResponse | null>(null);
 
@@ -50,6 +51,14 @@ export class AuthService {
         }),
       );
   }
+
+  loadProfile(): Observable<UserResponse> { return this.http.get<UserResponse>(`${this.usersUrl}/me`).pipe(tap(user => this.currentUser.set(user))); }
+  updateProfile(request: { displayName: string; title: string | null }): Observable<UserResponse> { return this.http.patch<UserResponse>(`${this.usersUrl}/me`, request).pipe(tap(user => this.currentUser.set(user))); }
+  updateStatus(request: { text: string | null; emoji: string | null; expiresAt: string | null }): Observable<UserResponse> { return this.http.put<UserResponse>(`${this.usersUrl}/me/status`, request).pipe(tap(user => this.currentUser.set(user))); }
+  clearStatus(): Observable<UserResponse> { return this.http.delete<UserResponse>(`${this.usersUrl}/me/status`).pipe(tap(user => this.currentUser.set(user))); }
+  uploadAvatar(file: File): Observable<UserResponse> { const body=new FormData();body.append('file',file);return this.http.post<UserResponse>(`${this.usersUrl}/me/avatar`,body).pipe(tap(user=>this.currentUser.set(user))); }
+  removeAvatar(): Observable<UserResponse> { return this.http.delete<UserResponse>(`${this.usersUrl}/me/avatar`).pipe(tap(user=>this.currentUser.set(user))); }
+  changePassword(request: { currentPassword: string; newPassword: string }): Observable<void> { return this.http.post<void>(`${this.usersUrl}/me/change-password`, request); }
 
   logout(): void {
     this.tokenService.removeToken();

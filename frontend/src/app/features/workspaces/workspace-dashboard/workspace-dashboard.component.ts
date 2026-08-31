@@ -50,6 +50,13 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly showCreateWorkspaceModal = signal(false);
   readonly workspaceCreateError = signal<string | null>(null);
   readonly showProfilePlaceholder = signal(false);
+  readonly showProfileModal = signal(false);
+  readonly showStatusModal = signal(false);
+  readonly profileSaving = signal(false);
+  readonly profileError = signal<string | null>(null);
+  readonly userPresence = signal<Record<number,'ONLINE'|'AWAY'|'OFFLINE'>>({});
+  private activityTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly activityHandler = () => { if(this.activityTimer)return;this.conversationWebSocketService.sendPresenceActivity();this.activityTimer=setTimeout(()=>this.activityTimer=null,30000); };
 
   readonly currentUser: AuthService['currentUser'];
 
@@ -219,6 +226,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
     description: ['', [Validators.maxLength(255)]],
   });
+  readonly profileForm=this.formBuilder.nonNullable.group({displayName:['',[Validators.required,Validators.maxLength(100)]],title:['',[Validators.maxLength(120)]]});
+  readonly statusForm=this.formBuilder.nonNullable.group({emoji:['',[Validators.maxLength(32)]],text:['',[Validators.maxLength(100)]],expiresAt:['']});
+  readonly passwordForm=this.formBuilder.nonNullable.group({currentPassword:['',[Validators.required]],newPassword:['',[Validators.required,Validators.minLength(8),Validators.maxLength(72)]]});
 
   constructor(
     private readonly workspaceService: WorkspaceService,
@@ -317,12 +327,16 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.loadWorkspaces();
     this.loadConversations();
+    this.authService.loadProfile().subscribe({next:user=>{this.subscribeToProfileEvents(user.id);this.profileForm.reset({displayName:user.displayName,title:user.title??''});},error:()=>{}});
+    ['pointerdown','keydown','focus'].forEach(name=>window.addEventListener(name,this.activityHandler));
   }
 
   ngOnDestroy(): void {
     if(this.searchTimer)clearTimeout(this.searchTimer); if(this.typingTimer)clearTimeout(this.typingTimer);
     this.messageWebSocketService.disconnect();
     this.conversationWebSocketService.disconnect();
+    ['pointerdown','keydown','focus'].forEach(name=>window.removeEventListener(name,this.activityHandler));
+    if(this.activityTimer)clearTimeout(this.activityTimer);
   }
 
   onSearchInput():void{if(this.searchTimer)clearTimeout(this.searchTimer);const q=this.searchForm.getRawValue().query.trim();if(q.length<2){this.searchResults.set([]);this.searchOpen.set(false);return;}this.searchTimer=setTimeout(()=>{this.searchLoading.set(true);this.searchService.search(q,this.selectedWorkspaceId()).subscribe({next:r=>{this.searchResults.set(r.results);this.searchOpen.set(true);this.searchLoading.set(false);},error:()=>this.searchLoading.set(false)});},300);}
@@ -647,6 +661,15 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.conversationMessagePendingDelete.set(null);
     this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
   }
+  avatarSrc(url:string|null|undefined):string|null{return url?`http://localhost:8080${url}`:null;}
+  openProfile():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,title:u.title??''});this.showProfileModal.set(true);}
+  openStatus():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
+  saveProfile():void{if(this.profileForm.invalid)return;this.profileSaving.set(true);const v=this.profileForm.getRawValue();this.authService.updateProfile({displayName:v.displayName,title:v.title||null}).subscribe({next:()=>{this.profileSaving.set(false);this.showProfileModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save profile.');}});}
+  saveStatus():void{if(this.statusForm.invalid)return;this.profileSaving.set(true);const v=this.statusForm.getRawValue();this.authService.updateStatus({text:v.text||null,emoji:v.emoji||null,expiresAt:v.expiresAt?new Date(v.expiresAt).toISOString():null}).subscribe({next:()=>{this.profileSaving.set(false);this.showStatusModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save status.');}});}
+  clearStatus():void{this.authService.clearStatus().subscribe(()=>this.showStatusModal.set(false));}
+  changeAvatar(event:Event):void{const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;this.profileSaving.set(true);this.authService.uploadAvatar(file).subscribe({next:()=>this.profileSaving.set(false),error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not upload avatar.');}});}
+  changePassword():void{if(this.passwordForm.invalid)return;this.profileSaving.set(true);this.authService.changePassword(this.passwordForm.getRawValue()).subscribe({next:()=>{this.profileSaving.set(false);this.passwordForm.reset();},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not change password.');}});}
+  private subscribeToProfileEvents(userId:number):void{this.conversationWebSocketService.subscribeToProfileEvents(userId,event=>{if(event.presence)this.userPresence.update(v=>({...v,[event.userId]:event.presence!}));if(event.userId===this.currentUser()?.id)this.authService.loadProfile().subscribe();if(event.type!=='PRESENCE_UPDATED'){this.loadConversations();if(this.showGroupMembersModal()&&this.selectedConversation())this.loadGroupMembers(this.selectedConversation()!.id);}});}
   closeGroupMembers(): void {
     if (this.groupMembersLoading() || this.groupMemberActionUserId() !== null) return;
     this.showGroupMembersModal.set(false); this.groupMemberPendingRemove.set(null);

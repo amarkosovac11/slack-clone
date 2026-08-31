@@ -569,6 +569,21 @@ input:focus {
     box-shadow: 0 24px 70px rgb(0 0 0 / 25%);
 }
 
+.user-rail-button { position: relative; overflow: visible; }
+.user-rail-button img, .profile-placeholder-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.presence-dot { position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border: 2px solid #3f0e40; border-radius: 50%; background: #9ca3af; }
+.presence-dot.online { background: #2bac76; }
+.presence-dot.away { background: #eab308; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+.profile-placeholder { display: grid; gap: 8px; }
+.profile-placeholder > button { width: 100%; padding: 9px 12px; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; }
+.profile-placeholder > button:hover { background: #f3f4f6; }
+.profile-avatar-editor { display: flex; align-items: center; gap: 16px; }
+.profile-avatar-editor > img, .profile-avatar-editor > span { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 14px; background: #611f69; color: white; font-size: 28px; object-fit: cover; }
+.profile-settings-modal { max-height: calc(100vh - 48px); overflow-y: auto; }
+.account-section { border-top: 1px solid #e5e7eb; }
+.status-fields { display: grid; grid-template-columns: 90px 1fr; gap: 12px; }
+
 .modal-header {
     display: flex;
     align-items: flex-start;

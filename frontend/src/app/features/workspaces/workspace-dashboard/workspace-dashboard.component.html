@@ -101,15 +101,16 @@
       <button type="button" class="workspace-rail-button user-rail-button"
         title="Account" aria-label="Open account menu" aria-haspopup="dialog"
         [attr.aria-expanded]="showProfilePlaceholder()"
-        (click)="toggleProfilePlaceholder()">{{ userInitial() }}</button>
+        (click)="toggleProfilePlaceholder()">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="" />}@else { {{ userInitial() }} }<span class="presence-dot online" title="Online"><span class="sr-only">Online</span></span></button>
       @if (showProfilePlaceholder()) {
         <section class="profile-placeholder" role="dialog" aria-label="Account menu">
           <div class="profile-placeholder-header">
-            <span class="profile-placeholder-avatar">{{ userInitial() }}</span>
-            <div><strong>{{ currentUser()?.displayName }}</strong><small>{{ currentUser()?.email }}</small></div>
+            <span class="profile-placeholder-avatar">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="" />}@else { {{ userInitial() }} }</span>
+            <div><strong>{{ currentUser()?.displayName }}</strong><small>{{ currentUser()?.presence ?? 'ONLINE' | titlecase }}@if(currentUser()?.customStatusText){ · {{currentUser()?.customStatusEmoji}} {{currentUser()?.customStatusText}}}</small></div>
           </div>
-          <p>Profile and account options are coming soon.</p>
-          <button type="button" class="secondary-button" (click)="closeProfilePlaceholder()">Got it</button>
+          <button type="button" (click)="openProfile()">Profile & settings</button>
+          <button type="button" (click)="openStatus()">Set a status</button>
+          <button type="button" class="destructive-menu-item" (click)="logout()">Sign out</button>
         </section>
       }
     </div>
@@ -493,6 +494,18 @@
 </section>
 
 }
+
+@if(showProfileModal()){
+<div class="modal-backdrop" (click)="showProfileModal.set(false)"><section class="create-channel-modal profile-settings-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+<header class="modal-header"><div><h2>Profile & settings</h2><p>Manage how people see you.</p></div><button type="button" class="modal-close-button" (click)="showProfileModal.set(false)">&times;</button></header>
+<form class="create-channel-form" [formGroup]="profileForm" (ngSubmit)="saveProfile()"><div class="profile-avatar-editor">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="Current avatar" />}@else{<span>{{userInitial()}}</span>}<label class="secondary-button">Change avatar<input type="file" accept="image/jpeg,image/png,image/webp" (change)="changeAvatar($event)" hidden></label></div>
+<div class="form-field"><label for="profile-name">Display name</label><input id="profile-name" formControlName="displayName"></div><div class="form-field"><label for="profile-title">Title</label><input id="profile-title" formControlName="title" placeholder="Backend Developer"></div>
+@if(profileError()){<div class="modal-error">{{profileError()}}</div>}<div class="modal-actions"><button type="button" class="secondary-button" (click)="showProfileModal.set(false)">Cancel</button><button type="submit" class="primary-button" [disabled]="profileSaving()||profileForm.invalid">Save</button></div></form>
+<form class="create-channel-form account-section" [formGroup]="passwordForm" (ngSubmit)="changePassword()"><h3>Change password</h3><div class="form-field"><label>Current password</label><input type="password" formControlName="currentPassword"></div><div class="form-field"><label>New password</label><input type="password" formControlName="newPassword"></div><button type="submit" class="secondary-button" [disabled]="profileSaving()||passwordForm.invalid">Change password</button></form>
+</section></div>}
+
+@if(showStatusModal()){
+<div class="modal-backdrop" (click)="showStatusModal.set(false)"><section class="create-channel-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()"><header class="modal-header"><div><h2>Set a status</h2><p>Presence and custom status are separate.</p></div><button type="button" class="modal-close-button" (click)="showStatusModal.set(false)">&times;</button></header><form class="create-channel-form" [formGroup]="statusForm" (ngSubmit)="saveStatus()"><div class="status-fields"><div class="form-field"><label>Emoji</label><input formControlName="emoji" placeholder="☕"></div><div class="form-field"><label>Status</label><input formControlName="text" placeholder="Coffee break"></div></div><div class="form-field"><label>Clear at (optional)</label><input type="datetime-local" formControlName="expiresAt"></div>@if(profileError()){<div class="modal-error">{{profileError()}}</div>}<div class="modal-actions"><button type="button" class="secondary-button" (click)="clearStatus()">Clear status</button><button type="submit" class="primary-button" [disabled]="profileSaving()||statusForm.invalid">Save</button></div></form></section></div>}
 
 @if (showChannelMembersModal()) {
 
