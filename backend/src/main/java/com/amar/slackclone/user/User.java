@@ -26,6 +26,24 @@ public class User {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
+    @Column(length = 120)
+    private String title;
+
+    @Column(name = "avatar_key", length = 100)
+    private String avatarKey;
+
+    @Column(name = "custom_status_text", length = 100)
+    private String customStatusText;
+
+    @Column(name = "custom_status_emoji", length = 32)
+    private String customStatusEmoji;
+
+    @Column(name = "custom_status_expires_at")
+    private Instant customStatusExpiresAt;
+
+    @Column(name = "last_seen_at")
+    private Instant lastSeenAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -76,6 +94,19 @@ public class User {
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
     }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getAvatarKey() { return avatarKey; }
+    public void setAvatarKey(String avatarKey) { this.avatarKey = avatarKey; }
+    public String getCustomStatusText() { return customStatusText; }
+    public void setCustomStatusText(String value) { this.customStatusText = value; }
+    public String getCustomStatusEmoji() { return customStatusEmoji; }
+    public void setCustomStatusEmoji(String value) { this.customStatusEmoji = value; }
+    public Instant getCustomStatusExpiresAt() { return customStatusExpiresAt; }
+    public void setCustomStatusExpiresAt(Instant value) { this.customStatusExpiresAt = value; }
+    public Instant getLastSeenAt() { return lastSeenAt; }
+    public void setLastSeenAt(Instant value) { this.lastSeenAt = value; }
 
     public Instant getCreatedAt() {
         return createdAt;

@@ -36,6 +36,11 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ApiError> handleSecurity(SecurityException e, HttpServletRequest request) {
+        return apiError(HttpStatus.FORBIDDEN, e.getMessage(), request);
+    }
+
     @ExceptionHandler(ConversationNotFoundException.class)
     public ResponseEntity<ApiError> handleConversationNotFound(ConversationNotFoundException e, HttpServletRequest request) {
         return apiError(HttpStatus.NOT_FOUND, e.getMessage(), request);
