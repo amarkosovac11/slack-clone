@@ -26,6 +26,7 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
     );
     private static final Pattern CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations/(\\d+)/(?:messages|metadata|typing)$");
     private static final Pattern USER_CONVERSATION_TOPIC = Pattern.compile("^/topic/users/(\\d+)/conversations$");
+    private static final Pattern USER_PROFILE_TOPIC = Pattern.compile("^/topic/users/(\\d+)/profile-events$");
     private static final Pattern CONVERSATION_SEND = Pattern.compile("^/app/conversations/(\\d+)/messages$");
     private static final Pattern CONVERSATION_TYPING_SEND=Pattern.compile("^/app/conversations/(\\d+)/typing$");
     private static final Pattern CHANNEL_TYPING_SEND=Pattern.compile("^/app/workspaces/(\\d+)/channels/(\\d+)/typing$");
@@ -116,12 +117,18 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
             if (!user.getId().equals(Long.valueOf(matcher.group(1)))) throw new IllegalArgumentException("Cannot subscribe to another user's updates");
             return;
         }
+        matcher = USER_PROFILE_TOPIC.matcher(safeDestination);
+        if (matcher.matches()) {
+            var user = conversationAccessService.requireUser(accessor.getUser().getName());
+            if (!user.getId().equals(Long.valueOf(matcher.group(1)))) throw new IllegalArgumentException("Cannot subscribe to another user's profile updates");
+            return;
+        }
         throw new IllegalArgumentException("WebSocket subscription destination is not allowed");
     }
 
     private void authorizeSend(StompHeaderAccessor accessor) {
         if (accessor.getUser() == null) throw new IllegalArgumentException("Unauthenticated WebSocket send");
         String destination=accessor.getDestination()==null?"":accessor.getDestination();Matcher matcher=CONVERSATION_SEND.matcher(destination);
-        if(matcher.matches()){conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)),accessor.getUser().getName());return;}matcher=CONVERSATION_TYPING_SEND.matcher(destination);if(matcher.matches()){conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)),accessor.getUser().getName());return;}matcher=CHANNEL_TYPING_SEND.matcher(destination);if(matcher.matches()){channelAccessService.validateChannelAccess(Long.valueOf(matcher.group(1)),Long.valueOf(matcher.group(2)),accessor.getUser().getName());return;}throw new IllegalArgumentException("WebSocket send destination is not allowed");
+        if(matcher.matches()){conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)),accessor.getUser().getName());return;}matcher=CONVERSATION_TYPING_SEND.matcher(destination);if(matcher.matches()){conversationAccessService.requireParticipant(Long.valueOf(matcher.group(1)),accessor.getUser().getName());return;}matcher=CHANNEL_TYPING_SEND.matcher(destination);if(matcher.matches()){channelAccessService.validateChannelAccess(Long.valueOf(matcher.group(1)),Long.valueOf(matcher.group(2)),accessor.getUser().getName());return;}if(destination.equals("/app/presence/activity"))return;throw new IllegalArgumentException("WebSocket send destination is not allowed");
     }
 }

@@ -1,0 +1,3 @@
+package com.amar.slackclone.presence;
+import org.springframework.messaging.handler.annotation.MessageMapping;import org.springframework.messaging.simp.stomp.StompHeaderAccessor;import org.springframework.stereotype.Controller;import java.security.Principal;
+@Controller public class PresenceWebSocketController{private final PresenceService presence;public PresenceWebSocketController(PresenceService presence){this.presence=presence;}@MessageMapping("/presence/activity")public void activity(Principal principal,StompHeaderAccessor accessor){presence.activity(accessor.getSessionId(),principal.getName());}}

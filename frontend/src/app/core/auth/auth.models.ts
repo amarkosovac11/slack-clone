@@ -14,6 +14,13 @@ export interface UserResponse {
   email: string;
   displayName: string;
   createdAt: string;
+  title?: string | null;
+  avatarUrl?: string | null;
+  customStatusText?: string | null;
+  customStatusEmoji?: string | null;
+  customStatusExpiresAt?: string | null;
+  presence?: 'ONLINE' | 'AWAY' | 'OFFLINE';
+  lastSeenAt?: string | null;
 }
 
 export interface LoginResponse {

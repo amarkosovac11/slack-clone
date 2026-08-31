@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 "/api/health",
                                 "/api/auth/register",
                                 "/api/auth/login",
+                                "/api/users/avatars/**",
                                 "/ws"
                         ).permitAll()
                         .anyRequest().authenticated()
