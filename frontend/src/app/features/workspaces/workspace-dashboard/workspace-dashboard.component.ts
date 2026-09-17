@@ -20,6 +20,7 @@ import { ConversationWebSocketService } from '../../conversations/conversation-w
 import { SearchHit, SearchService } from '../../search/search.service';
 import { AppNotification } from '../../notifications/notification.models';
 import { NotificationService } from '../../notifications/notification.service';
+import { environment } from '../../../../environments/environment';
 
 import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
 import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
@@ -688,7 +689,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.conversationMessagePendingDelete.set(null);
     this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
   }
-  avatarSrc(url:string|null|undefined):string|null{return url?`http://localhost:8080${url}`:null;}
+  avatarSrc(url:string|null|undefined):string|null{return url?`${environment.apiBaseUrl}${url}`:null;}
   openProfile():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,username:u.username,title:u.title??''});this.showProfileModal.set(true);}
   openStatus():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
   saveProfile():void{if(this.profileForm.invalid)return;this.profileSaving.set(true);const v=this.profileForm.getRawValue();this.authService.updateProfile({displayName:v.displayName,username:v.username,title:v.title||null}).subscribe({next:()=>{this.profileSaving.set(false);this.showProfileModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save profile.');}});}

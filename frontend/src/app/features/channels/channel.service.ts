@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
@@ -15,7 +16,7 @@ import {
 })
 export class ChannelService {
 
-  private readonly apiUrl = 'http://localhost:8080/api/workspaces';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/workspaces`;
 
   constructor(private readonly http: HttpClient) {}
 

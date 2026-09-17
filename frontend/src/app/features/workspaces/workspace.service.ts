@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { Observable } from 'rxjs';
 
 import {
@@ -12,7 +13,7 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
-  private readonly apiUrl = 'http://localhost:8080/api/workspaces';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/workspaces`;
 
   constructor(private readonly http: HttpClient) {}
 

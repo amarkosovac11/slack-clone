@@ -1,11 +1,12 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { Observable } from 'rxjs';
 import { Conversation, ConversationMessage, ConversationMessagePage, ConversationParticipant, ConversationReadReceipt, ConversationUser } from './conversation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConversationService {
-  private readonly url = 'http://localhost:8080/api/conversations';
+  private readonly url = `${environment.apiBaseUrl}/api/conversations`;
   constructor(private readonly http: HttpClient) {}
   list(): Observable<Conversation[]> { return this.http.get<Conversation[]>(this.url); }
   hidden():Observable<Conversation[]>{return this.http.get<Conversation[]>(`${this.url}/hidden`);}
@@ -23,7 +24,7 @@ export class ConversationService {
   unreact(id:number,messageId:number,emoji:string):Observable<ConversationMessage>{return this.http.delete<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);}
   thread(id:number,messageId:number):Observable<ConversationMessage[]>{return this.http.get<ConversationMessage[]>(`${this.url}/${id}/messages/${messageId}/thread`);}
   reply(id:number,messageId:number,content:string):Observable<ConversationMessage>{return this.http.post<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/replies`,{content});}
-  upload(messageId:number,file:File):Observable<{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}>{const data=new FormData();data.append('file',file);return this.http.post<{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}>(`http://localhost:8080/api/attachments/conversation/${messageId}`,data);}
+  upload(messageId:number,file:File):Observable<{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}>{const data=new FormData();data.append('file',file);return this.http.post<{id:number;originalFileName:string;mimeType:string;fileSize:number;downloadUrl:string}>(`${environment.apiBaseUrl}/api/attachments/conversation/${messageId}`,data);}
   startDirect(userId: number): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/direct`, { userId }); }
   createGroup(participantIds: number[]): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/group`, { participantIds }); }
   history(id: number, before?: number, limit = 50): Observable<ConversationMessagePage> {
