@@ -21,8 +21,10 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
     List<ConversationMessage> findAllByConversationIdAndSenderIdOrderById(Long conversationId,Long senderId);
     List<ConversationMessage> findAllByConversationIdAndIdLessThanEqualAndSenderIdNotOrderById(Long conversationId,Long throughId,Long senderId);
     List<ConversationMessage> findAllByThreadRootMessageIdAndCreatedAtGreaterThanEqualOrderByCreatedAt(Long rootId,java.time.OffsetDateTime joinedAt);
+    List<ConversationMessage> findByConversationIdAndIdLessThanEqualAndCreatedAtGreaterThanEqualOrderByIdDesc(Long conversationId,Long targetId,java.time.OffsetDateTime joinedAt,Pageable page);
+    List<ConversationMessage> findByConversationIdAndIdGreaterThanAndCreatedAtGreaterThanEqualOrderById(Long conversationId,Long targetId,java.time.OffsetDateTime joinedAt,Pageable page);
     long countByThreadRootMessageId(Long rootId);
-    @Query("select m from ConversationMessage m join ConversationParticipant cp on cp.conversation=m.conversation where cp.user.id=:userId and cp.leftAt is null and m.createdAt>=cp.joinedAt and m.deletedAt is null and lower(m.content) like lower(concat('%',:q,'%')) order by m.createdAt desc")List<ConversationMessage> searchAccessible(@Param("userId")Long userId,@Param("q")String q,Pageable p);
+    @Query("select m from ConversationMessage m join ConversationParticipant cp on cp.conversation=m.conversation where cp.user.id=:userId and cp.leftAt is null and cp.hiddenAt is null and m.createdAt>=cp.joinedAt and m.deletedAt is null and lower(m.content) like lower(concat('%',:q,'%')) order by m.createdAt desc")List<ConversationMessage> searchAccessible(@Param("userId")Long userId,@Param("q")String q,Pageable p);
 
     @Query("select count(m) from ConversationMessage m where m.conversation.id = :conversationId and m.id > :afterId and m.sender.id <> :userId and m.deletedAt is null")
     long countUnread(@Param("conversationId") Long conversationId, @Param("afterId") Long afterId, @Param("userId") Long userId);

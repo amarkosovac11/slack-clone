@@ -150,6 +150,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly messageMutationError = signal<string | null>(null);
   readonly messagePendingDelete = signal<Message | null>(null);
   readonly webSocketConnected: MessageWebSocketService['connected'];
+  readonly highlightedMessageId=signal<number|null>(null);
   readonly typingNames=signal<string[]>([]); readonly channelThread=signal<Message[]>([]); readonly conversationThread=signal<ConversationMessage[]>([]);
   readonly threadRootId=signal<number|null>(null); readonly selectedFile=signal<File|null>(null);
   readonly attachmentObjectUrls=signal<Record<string,string>>({});
@@ -356,7 +357,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.clearAttachmentObjectUrls();
   }
 
-  openSearchHit(hit:SearchHit):void{if(hit.channelId&&this.selectedWorkspaceId())void this.router.navigate(['/workspaces',this.selectedWorkspaceId(),'channels',hit.channelId]);else if(hit.conversationId)this.openConversation(hit.conversationId);}
+  openSearchHit(hit:SearchHit):void{if(hit.type==='USER'){this.conversationService.startDirect(hit.id).subscribe(conversation=>this.openConversation(conversation.id));return;}const queryParams=hit.type.endsWith('_MESSAGE')?{targetMessage:hit.id}:undefined;if(hit.channelId&&hit.workspaceId){void this.router.navigate(['/workspaces',hit.workspaceId,'channels',hit.channelId],{queryParams});return;}if(hit.conversationId){void this.router.navigate(['/conversations',hit.conversationId],{queryParams});}}
   openNotification(item:AppNotification):void{this.notificationService.markRead(item);this.showNotifications.set(false);if(item.conversationId){this.openConversation(item.conversationId);if(item.type==='THREAD_REPLY'&&item.conversationMessageId)setTimeout(()=>{const message=this.conversationMessages().find(x=>x.id===item.conversationMessageId);if(message)this.openConversationThread(message);},300);return;}if(item.workspaceId&&item.channelId){void this.router.navigate(['/workspaces',item.workspaceId,'channels',item.channelId]);if(item.type==='THREAD_REPLY'&&item.channelMessageId)setTimeout(()=>{const message=this.messages().find(x=>x.id===item.channelMessageId);if(message)this.openChannelThread(message);},500);}}
   chooseFile(event:Event):void{this.selectedFile.set((event.target as HTMLInputElement).files?.[0]??null);}
   attachmentUrl(attachment:Attachment):string|null{const key=this.attachmentKey(attachment);const existing=this.attachmentObjectUrls()[key];if(!existing)this.loadAttachment(attachment);return existing??null;}
@@ -788,6 +789,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         this.conversationCursor.set(page.nextBefore); this.conversationLoading.set(false);
         this.refreshReceipts(id);
         const latestReceived=[...page.messages].reverse().find(message=>message.senderId!==this.currentUser()?.id);if(latestReceived)this.conversationWebSocketService.acknowledgeDelivered(id,latestReceived.id);
+        this.loadConversationSearchTarget(id);
       },
       error: () => { this.conversationError.set('Could not load messages.'); this.conversationLoading.set(false); },
     });
@@ -1261,6 +1263,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)
         ));
         this.messagesLoading.set(false);
+        this.loadChannelSearchTarget(workspaceId,channelId);
       },
       error: (error: HttpErrorResponse) => {
         if (
@@ -1279,6 +1282,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       },
     });
   }
+
+  private routeTargetMessage():number|null{return this.parsePositiveRouteId(this.route.snapshot.queryParamMap.get('targetMessage'));}
+  private loadChannelSearchTarget(workspaceId:number,channelId:number):void{const target=this.routeTargetMessage();if(!target)return;this.messageService.context(workspaceId,channelId,target).subscribe(context=>{if(this.selectedChannel()?.id!==channelId)return;this.messages.set(context.messages);if(context.threadRootMessageId){const root=context.messages.find(message=>message.id===context.threadRootMessageId);if(root)this.openChannelThread(root);}this.focusSearchMessage(target);});}
+  private loadConversationSearchTarget(conversationId:number):void{const target=this.routeTargetMessage();if(!target)return;this.conversationService.context(conversationId,target).subscribe(context=>{if(this.selectedConversation()?.id!==conversationId)return;this.conversationMessages.set(context.messages);if(context.threadRootMessageId){const root=context.messages.find(message=>message.id===context.threadRootMessageId);if(root)this.openConversationThread(root);}this.focusSearchMessage(target);});}
+  private focusSearchMessage(messageId:number):void{this.highlightedMessageId.set(messageId);void this.router.navigate([],{relativeTo:this.route,queryParams:{targetMessage:null},queryParamsHandling:'merge',replaceUrl:true});setTimeout(()=>document.getElementById(`message-${messageId}`)?.scrollIntoView({behavior:'smooth',block:'center'}));setTimeout(()=>{if(this.highlightedMessageId()===messageId)this.highlightedMessageId.set(null);},2500);}
 
   loadWorkspaces(): void {
     this.isLoading.set(true);

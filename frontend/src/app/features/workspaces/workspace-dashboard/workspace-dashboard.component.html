@@ -273,7 +273,7 @@
         @if (!conversationLoading() && conversationMessages().length === 0) { <div class="message-empty-state"><div class="welcome-icon">&#9993;</div><h1>{{ conversation.displayName }}</h1><span>This is the beginning of your conversation.</span></div> }
         <div class="message-list">
           @for (message of conversationMessages(); track message.id) {
-            <article class="message-row"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
+            <article class="message-row" [id]="'message-'+message.id" [class.search-highlight]="highlightedMessageId()===message.id"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
               <div class="message-meta"><span class="message-sender">{{ message.senderDisplayName }}</span><time class="message-time" [attr.datetime]="message.createdAt">{{ message.createdAt | date:'shortTime' }}</time></div>
               @if (message.deletedAt) { <p class="message-text deleted-message">Message deleted</p> }
               @else if (editingConversationMessageId() === message.id) {
@@ -383,7 +383,7 @@
       @if (messages().length > 0) {
       <div class="message-list">
         @for (message of messages(); track message.id) {
-        <article class="message-row">
+        <article class="message-row" [id]="'message-'+message.id" [class.search-highlight]="highlightedMessageId()===message.id">
           <div class="message-avatar" aria-hidden="true">
             {{ message.senderDisplayName.charAt(0).toUpperCase() }}
           </div>
