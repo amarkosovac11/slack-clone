@@ -19,6 +19,7 @@ class ConversationServiceIntegrationTests {
     @Autowired WorkspaceRepository workspaces;
     @Autowired WorkspaceMemberRepository workspaceMembers;
     @Autowired ConversationParticipantRepository conversationParticipants;
+    @Autowired ConversationReceiptService receiptService;
     private User a, b, c, d, outsider;
 
     @BeforeEach
@@ -192,6 +193,22 @@ class ConversationServiceIntegrationTests {
     }
     @Test void hiddenRestoreReadReceiptAndCreatorTransferUseExistingState(){var direct=service.startDirect(new StartDirectConversationRequest(b.getId()),a.getEmail());var sent=service.send(direct.id(),new CreateConversationMessageRequest("hello"),a.getEmail());assertEquals(0,service.receipt(direct.id(),sent.id(),a.getEmail()).readCount());service.markRead(direct.id(),b.getEmail());assertEquals(1,service.receipt(direct.id(),sent.id(),a.getEmail()).readCount());service.hide(direct.id(),a.getEmail());assertEquals(direct.id(),service.hidden(a.getEmail()).getFirst().id());assertEquals(direct.id(),service.restore(direct.id(),a.getEmail()).id());
       var group=service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(),c.getId())),a.getEmail());service.transferCreator(group.id(),new TransferConversationCreatorRequest(b.getId()),a.getEmail());service.leave(group.id(),a.getEmail());assertThrows(ConversationAccessDeniedException.class,()->service.transferCreator(group.id(),new TransferConversationCreatorRequest(c.getId()),a.getEmail()));service.removeParticipant(group.id(),c.getId(),b.getEmail());}
+
+    @Test void deliveryAcknowledgementsArePrincipalScopedAndGroupReceiptsAggregate(){
+        var group=service.createGroup(new CreateGroupConversationRequest(List.of(b.getId(),c.getId())),a.getEmail());
+        var sent=service.send(group.id(),new CreateConversationMessageRequest("receipt test"),a.getEmail());
+        receiptService.acknowledgeDelivered(group.id(),sent.id(),b.getEmail());
+        var delivered=receiptService.receipt(group.id(),sent.id(),a.getEmail());
+        assertEquals(1,delivered.deliveredCount());assertEquals(0,delivered.readCount());assertEquals(2,delivered.totalRecipients());
+        receiptService.acknowledgeDelivered(group.id(),sent.id(),a.getEmail());
+        assertEquals(1,receiptService.receipt(group.id(),sent.id(),a.getEmail()).deliveredCount());
+        assertThrows(ConversationAccessDeniedException.class,()->receiptService.acknowledgeDelivered(group.id(),sent.id(),outsider.getEmail()));
+        assertThrows(ConversationAccessDeniedException.class,()->receiptService.receipt(group.id(),sent.id(),b.getEmail()));
+        service.markRead(group.id(),b.getEmail());
+        assertEquals(1,receiptService.receipt(group.id(),sent.id(),a.getEmail()).readCount());
+        receiptService.acknowledgeDelivered(group.id(),sent.id(),c.getEmail());service.markRead(group.id(),c.getEmail());
+        var seen=receiptService.receipt(group.id(),sent.id(),a.getEmail());assertEquals(2,seen.deliveredCount());assertEquals(2,seen.readCount());
+    }
 
     private User saveUser(String email, String name) {
         return users.save(new User(email, "hash", name, Instant.now(), Instant.now()));
