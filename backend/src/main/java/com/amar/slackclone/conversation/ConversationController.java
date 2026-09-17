@@ -13,7 +13,8 @@ import java.util.List;
 @RestController @Validated @RequestMapping("/api/conversations")
 public class ConversationController {
     private final ConversationService service;
-    public ConversationController(ConversationService service) { this.service = service; }
+    private final ConversationReceiptService receipts;
+    public ConversationController(ConversationService service,ConversationReceiptService receipts) { this.service = service;this.receipts=receipts; }
     @GetMapping public List<ConversationResponse> list(Authentication auth) { return service.list(auth.getName()); }
     @GetMapping("/hidden") public List<ConversationResponse> hidden(Authentication auth){return service.hidden(auth.getName());}
     @GetMapping("/eligible-users") public List<ConversationUserResponse> eligible(Authentication auth) { return service.eligibleUsers(auth.getName()); }
@@ -63,6 +64,7 @@ public class ConversationController {
     @PostMapping("/{id}/restore") public ConversationResponse restore(@PathVariable Long id,Authentication auth){return service.restore(id,auth.getName());}
     @PostMapping("/{id}/transfer-creator") public ConversationResponse transferCreator(@PathVariable Long id,@Valid @RequestBody TransferConversationCreatorRequest request,Authentication auth){return service.transferCreator(id,request,auth.getName());}
     @GetMapping("/{id}/messages/{messageId}/receipt") public ConversationReadReceiptResponse receipt(@PathVariable Long id,@PathVariable Long messageId,Authentication auth){return service.receipt(id,messageId,auth.getName());}
+    @GetMapping("/{id}/receipts") public List<ConversationMessageReceiptResponse> receipts(@PathVariable Long id,Authentication auth){return receipts.receipts(id,auth.getName());}
     @PatchMapping("/{id}/messages/{messageId}")
     public ConversationMessageResponse editMessage(@PathVariable Long id, @PathVariable Long messageId,
             @Valid @RequestBody UpdateConversationMessageRequest request, Authentication auth) {
