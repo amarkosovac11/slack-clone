@@ -31,6 +31,7 @@ export class ConversationService {
     if (before !== undefined) params = params.set('before', before);
     return this.http.get<ConversationMessagePage>(`${this.url}/${id}/messages`, { params });
   }
+  context(id:number,messageId:number):Observable<{targetMessageId:number;threadRootMessageId:number|null;messages:ConversationMessage[]}>{return this.http.get<{targetMessageId:number;threadRootMessageId:number|null;messages:ConversationMessage[]}>(`${this.url}/${id}/messages/${messageId}/context`);}
   send(id: number, content: string): Observable<ConversationMessage> { return this.http.post<ConversationMessage>(`${this.url}/${id}/messages`, { content }); }
   markRead(id: number): Observable<Conversation> { return this.http.post<Conversation>(`${this.url}/${id}/read`, {}); }
   rename(id: number, name: string | null): Observable<Conversation> { return this.http.patch<Conversation>(`${this.url}/${id}`, { name }); }

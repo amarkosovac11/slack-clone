@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, Observable } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, forkJoin, Observable, Subject, Subscription, switchMap, tap } from 'rxjs';
 
 import { ApiErrorResponse } from '../../../core/auth/auth.models';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -17,7 +17,7 @@ import { MessageWebSocketService } from '../../messages/message-websocket.servic
 import { Conversation, ConversationMessage, ConversationParticipant, ConversationUser } from '../../conversations/conversation.models';
 import { ConversationService } from '../../conversations/conversation.service';
 import { ConversationWebSocketService } from '../../conversations/conversation-websocket.service';
-import { SearchHit, SearchService } from '../../search/search.service';
+import { SearchFilter, SearchHit, SearchService } from '../../search/search.service';
 import { AppNotification } from '../../notifications/notification.models';
 import { NotificationService } from '../../notifications/notification.service';
 
@@ -146,6 +146,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly messagePendingDelete = signal<Message | null>(null);
   readonly webSocketConnected: MessageWebSocketService['connected'];
   readonly searchResults=signal<SearchHit[]>([]); readonly searchOpen=signal(false); readonly searchLoading=signal(false);
+  readonly searchFilter=signal<SearchFilter>('ALL');readonly searchHasNext=signal(false);readonly searchPage=signal(0);readonly highlightedMessageId=signal<number|null>(null);
   readonly typingNames=signal<string[]>([]); readonly channelThread=signal<Message[]>([]); readonly conversationThread=signal<ConversationMessage[]>([]);
   readonly threadRootId=signal<number|null>(null); readonly selectedFile=signal<File|null>(null);
   readonly attachmentObjectUrls=signal<Record<string,string>>({});
@@ -155,7 +156,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   private mentionRange:{start:number;end:number;kind:'channel'|'conversation'}|null=null;
   private readonly createdObjectUrls=new Set<string>();
   private attachmentGeneration=0;
-  private searchTimer:ReturnType<typeof setTimeout>|null=null; private typingTimer:ReturnType<typeof setTimeout>|null=null;
+  private readonly searchRequests=new Subject<{query:string;filter:SearchFilter;page:number}>();private readonly searchSubscription:Subscription; private typingTimer:ReturnType<typeof setTimeout>|null=null;
   readonly searchForm=this.formBuilder.nonNullable.group({query:['']});
   readonly threadReplyForm=this.formBuilder.nonNullable.group({content:['',[Validators.required,Validators.maxLength(4000)]]});
 
@@ -257,6 +258,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   ) {
     this.currentUser = this.authService.currentUser;
     this.webSocketConnected = this.messageWebSocketService.connected;
+    this.searchSubscription=this.searchRequests.pipe(debounceTime(300),distinctUntilChanged((a,b)=>a.query===b.query&&a.filter===b.filter&&a.page===b.page),tap(()=>this.searchLoading.set(true)),switchMap(request=>this.searchService.search(request.query,this.selectedWorkspaceId(),request.filter,request.page).pipe(catchError(()=>{this.searchLoading.set(false);return EMPTY;})))).subscribe(response=>{this.searchResults.update(current=>response.page===0?response.results:[...current,...response.results]);this.searchPage.set(response.page);this.searchHasNext.set(response.hasNext);this.searchOpen.set(true);this.searchLoading.set(false);});
   }
   private syncSelectionFromRoute(): void {
     const conversationId = this.parsePositiveRouteId(this.route.snapshot.paramMap.get('conversationId'));
@@ -345,7 +347,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    if(this.searchTimer)clearTimeout(this.searchTimer); if(this.typingTimer)clearTimeout(this.typingTimer);
+    this.searchSubscription.unsubscribe(); if(this.typingTimer)clearTimeout(this.typingTimer);
     this.messageWebSocketService.disconnect();
     this.conversationWebSocketService.disconnect();
     this.notificationService.disconnect();
@@ -354,8 +356,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.clearAttachmentObjectUrls();
   }
 
-  onSearchInput():void{if(this.searchTimer)clearTimeout(this.searchTimer);const q=this.searchForm.getRawValue().query.trim();if(q.length<2){this.searchResults.set([]);this.searchOpen.set(false);return;}this.searchTimer=setTimeout(()=>{this.searchLoading.set(true);this.searchService.search(q,this.selectedWorkspaceId()).subscribe({next:r=>{this.searchResults.set(r.results);this.searchOpen.set(true);this.searchLoading.set(false);},error:()=>this.searchLoading.set(false)});},300);}
-  openSearchHit(hit:SearchHit):void{this.searchOpen.set(false);if(hit.channelId&&this.selectedWorkspaceId())void this.router.navigate(['/workspaces',this.selectedWorkspaceId(),'channels',hit.channelId]);else if(hit.conversationId)this.openConversation(hit.conversationId);}
+  onSearchInput():void{const query=this.searchForm.getRawValue().query.trim();if(query.length<2){this.searchResults.set([]);this.searchOpen.set(false);return;}this.searchRequests.next({query,filter:this.searchFilter(),page:0});}
+  setSearchFilter(filter:SearchFilter):void{this.searchFilter.set(filter);this.onSearchInput();}
+  loadMoreSearch():void{const query=this.searchForm.getRawValue().query.trim();if(query.length>=2&&!this.searchLoading()&&this.searchHasNext())this.searchRequests.next({query,filter:this.searchFilter(),page:this.searchPage()+1});}
+  openSearchHit(hit:SearchHit):void{this.searchOpen.set(false);if(hit.type==='USER'){this.conversationService.startDirect(hit.id).subscribe(conversation=>this.openConversation(conversation.id));return;}const queryParams=hit.type.endsWith('_MESSAGE')?{targetMessage:hit.id}:undefined;if(hit.channelId&&hit.workspaceId){void this.router.navigate(['/workspaces',hit.workspaceId,'channels',hit.channelId],{queryParams});return;}if(hit.conversationId){void this.router.navigate(['/conversations',hit.conversationId],{queryParams});}}
   openNotification(item:AppNotification):void{this.notificationService.markRead(item);this.showNotifications.set(false);if(item.conversationId){this.openConversation(item.conversationId);if(item.type==='THREAD_REPLY'&&item.conversationMessageId)setTimeout(()=>{const message=this.conversationMessages().find(x=>x.id===item.conversationMessageId);if(message)this.openConversationThread(message);},300);return;}if(item.workspaceId&&item.channelId){void this.router.navigate(['/workspaces',item.workspaceId,'channels',item.channelId]);if(item.type==='THREAD_REPLY'&&item.channelMessageId)setTimeout(()=>{const message=this.messages().find(x=>x.id===item.channelMessageId);if(message)this.openChannelThread(message);},500);}}
   chooseFile(event:Event):void{this.selectedFile.set((event.target as HTMLInputElement).files?.[0]??null);}
   attachmentUrl(attachment:Attachment):string|null{const key=this.attachmentKey(attachment);const existing=this.attachmentObjectUrls()[key];if(!existing)this.loadAttachment(attachment);return existing??null;}
@@ -785,6 +789,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         this.conversationMessages.set([...merged.values()].sort((a, b) => a.id - b.id));
         this.conversationCursor.set(page.nextBefore); this.conversationLoading.set(false);
         this.refreshReceipts(id);
+        this.loadConversationSearchTarget(id);
       },
       error: () => { this.conversationError.set('Could not load messages.'); this.conversationLoading.set(false); },
     });
@@ -1256,6 +1261,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)
         ));
         this.messagesLoading.set(false);
+        this.loadChannelSearchTarget(workspaceId,channelId);
       },
       error: (error: HttpErrorResponse) => {
         if (
@@ -1274,6 +1280,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       },
     });
   }
+
+  private routeTargetMessage():number|null{return this.parsePositiveRouteId(this.route.snapshot.queryParamMap.get('targetMessage'));}
+  private loadChannelSearchTarget(workspaceId:number,channelId:number):void{const target=this.routeTargetMessage();if(!target)return;this.messageService.context(workspaceId,channelId,target).subscribe(context=>{if(this.selectedChannel()?.id!==channelId)return;this.messages.set(context.messages);if(context.threadRootMessageId){const root=context.messages.find(message=>message.id===context.threadRootMessageId);if(root)this.openChannelThread(root);}this.focusSearchMessage(target);});}
+  private loadConversationSearchTarget(conversationId:number):void{const target=this.routeTargetMessage();if(!target)return;this.conversationService.context(conversationId,target).subscribe(context=>{if(this.selectedConversation()?.id!==conversationId)return;this.conversationMessages.set(context.messages);if(context.threadRootMessageId){const root=context.messages.find(message=>message.id===context.threadRootMessageId);if(root)this.openConversationThread(root);}this.focusSearchMessage(target);});}
+  private focusSearchMessage(messageId:number):void{this.highlightedMessageId.set(messageId);void this.router.navigate([],{relativeTo:this.route,queryParams:{targetMessage:null},queryParamsHandling:'merge',replaceUrl:true});setTimeout(()=>document.getElementById(`message-${messageId}`)?.scrollIntoView({behavior:'smooth',block:'center'}));setTimeout(()=>{if(this.highlightedMessageId()===messageId)this.highlightedMessageId.set(null);},2500);}
 
   loadWorkspaces(): void {
     this.isLoading.set(true);

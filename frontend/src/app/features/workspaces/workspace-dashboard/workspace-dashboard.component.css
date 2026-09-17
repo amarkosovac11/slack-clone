@@ -353,6 +353,8 @@ input:focus {
 .message-row:hover {
     background: #f9fafb;
 }
+.message-row.search-highlight{background:rgba(255,215,96,.22);box-shadow:inset 3px 0 #e5a50a;transition:background .4s ease;}
+.search-filters{display:flex;gap:4px;flex-wrap:wrap;padding:6px}.search-filters button.active{background:#611f69;color:#fff}
 
 .message-avatar {
     display: grid;

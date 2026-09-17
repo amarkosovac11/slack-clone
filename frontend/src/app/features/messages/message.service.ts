@@ -28,6 +28,7 @@ export class MessageService {
       `${this.apiUrl}/${workspaceId}/channels/${channelId}/messages`
     );
   }
+  context(workspaceId:number,channelId:number,messageId:number):Observable<{targetMessageId:number;threadRootMessageId:number|null;messages:Message[]}>{return this.http.get<{targetMessageId:number;threadRootMessageId:number|null;messages:Message[]}>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}/context`);}
 
   createMessage(
     workspaceId: number,

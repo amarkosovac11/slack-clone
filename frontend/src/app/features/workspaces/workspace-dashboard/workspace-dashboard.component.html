@@ -122,9 +122,11 @@
       <button type="button" class="notification-bell" aria-label="Notifications" (click)="showNotifications.set(!showNotifications())">🔔@if(notificationService.unreadCount()>0){<span>{{notificationService.unreadCount()}}</span>}</button>
       @if(showNotifications()){<section class="notification-panel"><header><h3>Notifications</h3><button type="button" (click)="notificationService.markAllRead()">Mark all read</button></header>@if(notificationService.notifications().length===0){<p>No notifications yet.</p>}@for(item of notificationService.notifications();track item.id){<button type="button" class="notification-item" [class.unread]="!item.readAt" (click)="openNotification(item)">@if(avatarSrc(item.actorAvatarUrl);as avatar){<img [src]="avatar" alt="">}<span><strong>{{item.text}}</strong><small>{{item.createdAt|date:'short'}}</small></span></button>}</section>}
       @if(searchOpen()) { <div class="search-results">
+        <div class="search-filters">@for(filter of ['ALL','MESSAGES','CHANNELS','PEOPLE','CONVERSATIONS'];track filter){<button type="button" [class.active]="searchFilter()===filter" (click)="setSearchFilter($any(filter))">{{filter==='ALL'?'All':filter==='PEOPLE'?'People':filter.charAt(0)+filter.slice(1).toLowerCase()}}</button>}</div>
         @if(searchLoading()){<p>Searching...</p>}
-        @for(hit of searchResults();track hit.type + hit.id){<button type="button" (click)="openSearchHit(hit)"><strong>{{hit.title}}</strong><span>{{hit.contextName}}</span><small>{{hit.snippet}}</small></button>}
+        @for(hit of searchResults();track hit.type + hit.id){<button type="button" (click)="openSearchHit(hit)"><strong>{{hit.title}}</strong><span>{{hit.contextName}}</span>@if(hit.timestamp){<time>{{hit.timestamp|date:'short'}}</time>}<small>{{hit.snippet}}</small></button>}
         @if(!searchLoading() && searchResults().length===0){<p>No accessible results found.</p>}
+        @if(searchHasNext()){<button type="button" (click)="loadMoreSearch()" [disabled]="searchLoading()">Load more</button>}
       </div> }
     </div>
 
@@ -278,7 +280,7 @@
         @if (!conversationLoading() && conversationMessages().length === 0) { <div class="message-empty-state"><div class="welcome-icon">&#9993;</div><h1>{{ conversation.displayName }}</h1><span>This is the beginning of your conversation.</span></div> }
         <div class="message-list">
           @for (message of conversationMessages(); track message.id) {
-            <article class="message-row"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
+            <article class="message-row" [id]="'message-'+message.id" [class.search-highlight]="highlightedMessageId()===message.id"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
               <div class="message-meta"><span class="message-sender">{{ message.senderDisplayName }}</span><time class="message-time" [attr.datetime]="message.createdAt">{{ message.createdAt | date:'shortTime' }}</time></div>
               @if (message.deletedAt) { <p class="message-text deleted-message">Message deleted</p> }
               @else if (editingConversationMessageId() === message.id) {
@@ -388,7 +390,7 @@
       @if (messages().length > 0) {
       <div class="message-list">
         @for (message of messages(); track message.id) {
-        <article class="message-row">
+        <article class="message-row" [id]="'message-'+message.id" [class.search-highlight]="highlightedMessageId()===message.id">
           <div class="message-avatar" aria-hidden="true">
             {{ message.senderDisplayName.charAt(0).toUpperCase() }}
           </div>
