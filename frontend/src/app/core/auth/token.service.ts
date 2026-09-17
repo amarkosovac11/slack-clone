@@ -19,6 +19,8 @@ export class TokenService {
   }
 
   hasToken(): boolean {
-    return this.getToken() !== null;
+    const token=this.getToken();if(token===null)return false;
+    if(this.isExpired(token)){this.removeToken();return false;}return true;
   }
+  private isExpired(token:string):boolean{try{const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) as {exp?:number};return typeof payload.exp!=='number'||payload.exp*1000<=Date.now();}catch{return true;}}
 }
