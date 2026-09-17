@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { Observable } from 'rxjs';
 
 import {
@@ -14,7 +15,7 @@ import {
 })
 export class MessageService {
 
-  private readonly apiUrl = 'http://localhost:8080/api/workspaces';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/workspaces`;
 
   constructor(
     private readonly http: HttpClient,
@@ -60,5 +61,5 @@ export class MessageService {
   unreact(workspaceId:number,channelId:number,messageId:number,emoji:string):Observable<Message>{return this.http.delete<Message>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);}
   thread(workspaceId:number,channelId:number,messageId:number):Observable<Message[]>{return this.http.get<Message[]>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}/thread`);}
   reply(workspaceId:number,channelId:number,messageId:number,content:string):Observable<Message>{return this.http.post<Message>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/messages/${messageId}/replies`,{content});}
-  upload(messageId:number,file:File):Observable<import('./message.models').Attachment>{const data=new FormData();data.append('file',file);return this.http.post<import('./message.models').Attachment>(`http://localhost:8080/api/attachments/channel/${messageId}`,data);}
+  upload(messageId:number,file:File):Observable<import('./message.models').Attachment>{const data=new FormData();data.append('file',file);return this.http.post<import('./message.models').Attachment>(`${environment.apiBaseUrl}/api/attachments/channel/${messageId}`,data);}
 }

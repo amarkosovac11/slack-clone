@@ -75,6 +75,38 @@ spring.datasource.url=jdbc:postgresql://localhost:5433/slack_clone_db
 
 The database, backend, and frontend should run in separate processes.
 
+## Environment variables
+
+The backend accepts the following environment variables. Values shown are local-development examples, not production credentials.
+
+| Variable | Local default | Purpose |
+| --- | --- | --- |
+| `DB_URL` | `jdbc:postgresql://localhost:5433/slack_clone_db` | PostgreSQL JDBC URL |
+| `DB_USERNAME` | `slack_user` | Database user |
+| `DB_PASSWORD` | `slack_password` | Database password |
+| `JWT_SECRET` | local-only Base64 key | Base64-encoded JWT signing key (at least 32 decoded bytes) |
+| `JWT_EXPIRATION_MS` | `86400000` | Access-token lifetime |
+| `ALLOWED_ORIGINS` | `http://localhost:4200` | Comma-separated REST and WebSocket origins |
+| `UPLOAD_DIRECTORY` | `uploads` | Local attachment/avatar directory |
+| `JPA_SHOW_SQL` | `false` | Enable SQL logging for local diagnostics |
+
+Production deployments must supply a unique, randomly generated `JWT_SECRET` and real database credentials. Never reuse the repository's local defaults. Local filesystem storage is suitable for development and a single backend instance; shared object storage is a future production improvement.
+
+Frontend endpoints are centralized in `src/environments`. Development uses `http://localhost:8080`; production uses same-origin `/api` requests and derives `ws://` or `wss://` from the page origin. Change the production environment file at build time if the API is hosted on another origin.
+
+Build and verify the production frontend with:
+
+```powershell
+cd frontend
+npm ci
+npm test -- --watch=false
+npm run build
+```
+
+## Frontend component responsibilities
+
+The workspace dashboard remains the high-level coordinator for route selection, workspace/channel/conversation state, and navigation. Search query/debounce/result rendering is owned by `SearchPanelComponent`, while notification rendering and notification actions are owned by `NotificationPanelComponent`. Existing workspace members, invitations, and settings are also standalone feature components; further message-list extraction can continue incrementally without introducing a separate state library.
+
 ### 1. Start PostgreSQL
 
 Open PowerShell in the project root:

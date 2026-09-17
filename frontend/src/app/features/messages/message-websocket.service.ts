@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 
 import { TokenService } from '../../core/auth/token.service';
@@ -17,7 +18,7 @@ export class MessageWebSocketService {
 
   constructor(private readonly tokenService: TokenService) {
     this.client = new Client({
-      brokerURL: 'ws://localhost:8080/ws',
+      brokerURL: environment.webSocketUrl,
       reconnectDelay: 5000,
       beforeConnect: () => {
         const token = this.tokenService.getToken();

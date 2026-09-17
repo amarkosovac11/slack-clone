@@ -117,15 +117,10 @@
   </nav>
 
   <aside class="channel-sidebar">
-    <div class="global-search" [formGroup]="searchForm">
-      <input type="search" formControlName="query" placeholder="Search messages and people" aria-label="Search" (input)="onSearchInput()">
+    <app-search-panel [workspaceId]="selectedWorkspaceId()" (selected)="openSearchHit($event)"></app-search-panel>
+    <div class="global-search">
       <button type="button" class="notification-bell" aria-label="Notifications" (click)="showNotifications.set(!showNotifications())">🔔@if(notificationService.unreadCount()>0){<span>{{notificationService.unreadCount()}}</span>}</button>
-      @if(showNotifications()){<section class="notification-panel"><header><h3>Notifications</h3><button type="button" (click)="notificationService.markAllRead()">Mark all read</button></header>@if(notificationService.notifications().length===0){<p>No notifications yet.</p>}@for(item of notificationService.notifications();track item.id){<button type="button" class="notification-item" [class.unread]="!item.readAt" (click)="openNotification(item)">@if(avatarSrc(item.actorAvatarUrl);as avatar){<img [src]="avatar" alt="">}<span><strong>{{item.text}}</strong><small>{{item.createdAt|date:'short'}}</small></span></button>}</section>}
-      @if(searchOpen()) { <div class="search-results">
-        @if(searchLoading()){<p>Searching...</p>}
-        @for(hit of searchResults();track hit.type + hit.id){<button type="button" (click)="openSearchHit(hit)"><strong>{{hit.title}}</strong><span>{{hit.contextName}}</span><small>{{hit.snippet}}</small></button>}
-        @if(!searchLoading() && searchResults().length===0){<p>No accessible results found.</p>}
-      </div> }
+      @if(showNotifications()){<app-notification-panel (selected)="openNotification($event)"></app-notification-panel>}
     </div>
 
     @if (selectedWorkspace()) {

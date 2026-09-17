@@ -1,4 +1,5 @@
 import { Injectable, signal } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { TokenService } from '../../core/auth/token.service';
 import { ConversationListEvent, ConversationMessageEvent, ConversationMetadataEvent, ConversationReceiptEvent } from './conversation.models';
@@ -17,7 +18,7 @@ export class ConversationWebSocketService {
   private desiredConversation: { id: number; userId: number; messageCallback: (event: ConversationMessageEvent) => void; metadataCallback: (event: ConversationMetadataEvent) => void; receiptCallback:(event:ConversationReceiptEvent)=>void; typingCallback?: (event: {userId:number;displayName:string;typing:boolean}) => void } | null = null;
   readonly connected = signal(false);
   constructor(tokenService: TokenService) {
-    this.client = new Client({ brokerURL: 'ws://localhost:8080/ws', reconnectDelay: 5000,
+    this.client = new Client({ brokerURL: environment.webSocketUrl, reconnectDelay: 5000,
       beforeConnect: () => { const token = tokenService.getToken(); this.client.connectHeaders = token ? { Authorization: `Bearer ${token}` } : {}; },
       onConnect: () => { this.connected.set(true); this.activateUpdateSubscription(); this.activateMessageSubscription(); this.activateProfileSubscription(); },
       onWebSocketClose: () => { this.connected.set(false); this.messageSubscription = null; this.metadataSubscription = null; this.updatesSubscription = null; },

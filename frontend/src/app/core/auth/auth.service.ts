@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { Observable, tap } from 'rxjs';
 
 import {
@@ -14,8 +15,8 @@ import { TokenService } from './token.service';
   providedIn: 'root',
 })
 export class AuthService {
-  private readonly apiUrl = 'http://localhost:8080/api/auth';
-  private readonly usersUrl = 'http://localhost:8080/api/users';
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/auth`;
+  private readonly usersUrl = `${environment.apiBaseUrl}/api/users`;
 
   readonly currentUser = signal<UserResponse | null>(null);
 

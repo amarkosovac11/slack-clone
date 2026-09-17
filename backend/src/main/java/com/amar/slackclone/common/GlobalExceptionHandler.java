@@ -200,15 +200,15 @@ public class GlobalExceptionHandler {
     ) {
         ApiError error = new ApiError(
                 Instant.now(),
-                HttpStatus.CONFLICT.value(),
-                HttpStatus.CONFLICT.getReasonPhrase(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
                 exception.getMessage(),
                 request.getRequestURI(),
                 null
         );
 
         return ResponseEntity
-                .status(HttpStatus.CONFLICT)
+                .status(HttpStatus.BAD_REQUEST)
                 .body(error);
     }
 

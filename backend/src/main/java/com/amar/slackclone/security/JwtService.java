@@ -21,9 +21,9 @@ public class JwtService {
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.expiration-ms}") long expirationMs
     ) {
-        this.signingKey = Keys.hmacShaKeyFor(
-                Decoders.BASE64.decode(secret)
-        );
+        byte[] decoded=Decoders.BASE64.decode(secret);
+        if(decoded.length<32)throw new IllegalStateException("JWT_SECRET must be Base64 and decode to at least 32 bytes");
+        this.signingKey = Keys.hmacShaKeyFor(decoded);
         this.expirationMs = expirationMs;
     }
 
@@ -66,4 +66,4 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload();
     }
-}   
+}
