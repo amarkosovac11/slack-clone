@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { TokenService } from '../../core/auth/token.service';
-import { ConversationListEvent, ConversationMessageEvent, ConversationMetadataEvent } from './conversation.models';
+import { ConversationListEvent, ConversationMessageEvent, ConversationMetadataEvent, ConversationReceiptEvent } from './conversation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConversationWebSocketService {
@@ -9,11 +9,12 @@ export class ConversationWebSocketService {
   private messageSubscription: StompSubscription | null = null;
   private metadataSubscription: StompSubscription | null = null;
   private typingSubscription: StompSubscription | null = null;
+  private receiptSubscription: StompSubscription | null = null;
   private updatesSubscription: StompSubscription | null = null;
   private profileSubscription: StompSubscription | null = null;
   private desiredProfile: { userId: number; callback: (event: UserProfileEvent) => void } | null = null;
   private desiredUpdate: { userId: number; callback: (event: ConversationListEvent) => void } | null = null;
-  private desiredConversation: { id: number; userId: number; messageCallback: (event: ConversationMessageEvent) => void; metadataCallback: (event: ConversationMetadataEvent) => void; typingCallback?: (event: {userId:number;displayName:string;typing:boolean}) => void } | null = null;
+  private desiredConversation: { id: number; userId: number; messageCallback: (event: ConversationMessageEvent) => void; metadataCallback: (event: ConversationMetadataEvent) => void; receiptCallback:(event:ConversationReceiptEvent)=>void; typingCallback?: (event: {userId:number;displayName:string;typing:boolean}) => void } | null = null;
   readonly connected = signal(false);
   constructor(tokenService: TokenService) {
     this.client = new Client({ brokerURL: 'ws://localhost:8080/ws', reconnectDelay: 5000,
@@ -31,16 +32,18 @@ export class ConversationWebSocketService {
   }
   subscribeToConversation(id: number, userId: number, messageCallback: (event: ConversationMessageEvent) => void,
       metadataCallback: (event: ConversationMetadataEvent) => void,
+      receiptCallback:(event:ConversationReceiptEvent)=>void,
       typingCallback?: (event: {userId:number;displayName:string;typing:boolean}) => void): void {
     this.unsubscribeConversation();
-    this.desiredConversation = { id, userId, messageCallback, metadataCallback, typingCallback }; this.connect(); this.activateMessageSubscription();
+    this.desiredConversation = { id, userId, messageCallback, metadataCallback,receiptCallback, typingCallback }; this.connect(); this.activateMessageSubscription();
   }
   send(id: number, content: string): boolean {
     if (!this.client.connected) return false;
     this.client.publish({ destination: `/app/conversations/${id}/messages`, body: JSON.stringify({ content }) }); return true;
   }
   sendTyping(id:number,typing:boolean):void{if(this.client.connected)this.client.publish({destination:`/app/conversations/${id}/typing`,body:JSON.stringify({typing})});}
-  unsubscribeConversation(): void { this.messageSubscription?.unsubscribe(); this.metadataSubscription?.unsubscribe(); this.typingSubscription?.unsubscribe(); this.messageSubscription = null; this.metadataSubscription = null; this.typingSubscription=null; this.desiredConversation = null; }
+  acknowledgeDelivered(id:number,messageId:number):void{if(this.client.connected)this.client.publish({destination:`/app/conversations/${id}/messages/${messageId}/delivered`,body:'{}'});}
+  unsubscribeConversation(): void { this.messageSubscription?.unsubscribe(); this.metadataSubscription?.unsubscribe(); this.typingSubscription?.unsubscribe();this.receiptSubscription?.unsubscribe(); this.messageSubscription = null; this.metadataSubscription = null; this.typingSubscription=null;this.receiptSubscription=null; this.desiredConversation = null; }
   disconnect(): void { this.unsubscribeConversation(); this.updatesSubscription?.unsubscribe(); this.profileSubscription?.unsubscribe(); this.updatesSubscription = null; this.profileSubscription=null; this.desiredUpdate = null; this.desiredProfile=null; if (this.client.active) void this.client.deactivate(); }
   private activateUpdateSubscription(): void { if (!this.client.connected || !this.desiredUpdate || this.updatesSubscription) return;
     const desired = this.desiredUpdate; this.updatesSubscription = this.client.subscribe(`/topic/users/${desired.userId}/conversations`, frame => desired.callback(JSON.parse(frame.body) as ConversationListEvent)); }
@@ -49,6 +52,7 @@ export class ConversationWebSocketService {
     const desired = this.desiredConversation;
     this.messageSubscription = this.client.subscribe(`/topic/users/${desired.userId}/conversations/${desired.id}/messages`, frame => desired.messageCallback(JSON.parse(frame.body) as ConversationMessageEvent));
     this.metadataSubscription = this.client.subscribe(`/topic/users/${desired.userId}/conversations/${desired.id}/metadata`, frame => desired.metadataCallback(JSON.parse(frame.body) as ConversationMetadataEvent));
+    this.receiptSubscription=this.client.subscribe(`/topic/users/${desired.userId}/conversations/${desired.id}/receipts`,frame=>desired.receiptCallback(JSON.parse(frame.body) as ConversationReceiptEvent));
     if(desired.typingCallback)this.typingSubscription=this.client.subscribe(`/topic/users/${desired.userId}/conversations/${desired.id}/typing`,frame=>desired.typingCallback!(JSON.parse(frame.body))); }
 }
 
