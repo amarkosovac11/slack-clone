@@ -17,7 +17,13 @@ public record RegisterRequest(
 
         @NotBlank(message = "Display name is required")
         @Size(min = 2, max = 100, message = "Display name must contain between 2 and 100 characters")
-        String displayName
+        String displayName,
+
+        @NotBlank(message = "Username is required")
+        @Size(min = 3, max = 32, message = "Username must contain between 3 and 32 characters")
+        @jakarta.validation.constraints.Pattern(regexp = "^[A-Za-z0-9][A-Za-z0-9._]{2,31}$",
+                message = "Username may contain letters, numbers, dots and underscores")
+        String username
 
 ) {
 }

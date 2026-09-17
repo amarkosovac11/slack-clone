@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.List;
+import com.amar.slackclone.notification.*;
 
 @Service
 public class WorkspaceInvitationService {
@@ -20,17 +21,20 @@ public class WorkspaceInvitationService {
     private final WorkspaceInvitationRepository workspaceInvitationRepository;
     private final UserRepository userRepository;
     private final WorkspaceAccessService workspaceAccessService;
+    private final NotificationService notificationService;
 
     public WorkspaceInvitationService(
             WorkspaceMemberRepository workspaceMemberRepository,
             WorkspaceInvitationRepository workspaceInvitationRepository,
             UserRepository userRepository,
-            WorkspaceAccessService workspaceAccessService
+            WorkspaceAccessService workspaceAccessService,
+            NotificationService notificationService
     ) {
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.workspaceInvitationRepository = workspaceInvitationRepository;
         this.userRepository = userRepository;
         this.workspaceAccessService = workspaceAccessService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -112,6 +116,10 @@ public class WorkspaceInvitationService {
 
         WorkspaceInvitation savedInvitation =
                 workspaceInvitationRepository.save(invitation);
+
+        notificationService.create(invitedUser.getId(), currentUser.getId(), NotificationType.WORKSPACE_INVITATION,
+                currentUser.getDisplayName() + " invited you to " + workspace.getName(),
+                new NotificationService.Context(workspaceId, null, null, null, null));
 
         return toResponse(savedInvitation);
     }

@@ -25,10 +25,13 @@ public class AttachmentController {
     private final ChannelAccessService channelAccess;
     private final ConversationAccessService conversationAccess;
     private final UserRepository users;
+    private final MessageService messageService;
+    private final ConversationService conversationService;
 
     public AttachmentController(FileStorageService s, ChannelMessageAttachmentRepository ca,
             ConversationMessageAttachmentRepository coa, MessageRepository m, ConversationMessageRepository cm,
-            ChannelAccessService ch, ConversationAccessService co, UserRepository u) {
+            ChannelAccessService ch, ConversationAccessService co, UserRepository u,
+            MessageService messageService, ConversationService conversationService) {
         storage = s;
         channelAttachments = ca;
         conversationAttachments = coa;
@@ -37,6 +40,8 @@ public class AttachmentController {
         channelAccess = ch;
         conversationAccess = co;
         users = u;
+        this.messageService = messageService;
+        this.conversationService = conversationService;
     }
 
     @PostMapping(value = "/channel/{messageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -44,7 +49,7 @@ public class AttachmentController {
     public AttachmentResponse uploadChannel(@PathVariable Long messageId, @RequestPart("file") MultipartFile file,
             Authentication a) throws IOException {
         Message m = messages.findById(messageId).orElseThrow(() -> new MessageNotFoundException(messageId));
-        channelAccess.validateChannelAccess(m.getChannel().getWorkspace().getId(), m.getChannel().getId(), a.getName());
+        channelAccess.validateChannelWriteAccess(m.getChannel().getWorkspace().getId(), m.getChannel().getId(), a.getName());
         if (m.getDeletedAt() != null)
             throw new IllegalArgumentException("Deleted message cannot receive attachments");
         ChannelMessageAttachment x = new ChannelMessageAttachment();
@@ -52,6 +57,7 @@ public class AttachmentController {
         x.setUploadedBy(users.findByEmailIgnoreCase(a.getName()).orElseThrow());
         fill(x, file, storage.store(file));
         x = channelAttachments.save(x);
+        messageService.attachmentAdded(m.getChannel().getWorkspace().getId(), m.getChannel().getId(), m.getId(), a.getName());
         return dto(x);
     }
 
@@ -68,6 +74,7 @@ public class AttachmentController {
         x.setUploadedBy(users.findByEmailIgnoreCase(a.getName()).orElseThrow());
         fill(x, file, storage.store(file));
         x = conversationAttachments.save(x);
+        conversationService.attachmentAdded(m.getConversation().getId(), m.getId(), a.getName());
         return dto(x);
     }
 

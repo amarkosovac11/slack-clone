@@ -40,6 +40,10 @@ public class AuthService {
                     "Email is already registered"
             );
         }
+        String username = request.username().trim().toLowerCase(Locale.ROOT);
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new IllegalArgumentException("Username is already in use");
+        }
 
         Instant now = Instant.now();
 
@@ -50,6 +54,7 @@ public class AuthService {
                 now,
                 now
         );
+        user.setUsername(username);
 
         User savedUser = userRepository.save(user);
 
@@ -106,6 +111,7 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 user.getDisplayName(),
+                user.getUsername(),
                 user.getCreatedAt()
         );
     }

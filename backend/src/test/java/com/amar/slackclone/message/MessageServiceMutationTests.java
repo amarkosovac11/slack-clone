@@ -34,7 +34,8 @@ class MessageServiceMutationTests {
                 mock(ChannelPinnedMessageRepository.class), mock(ChannelMessageMentionRepository.class),
                 mock(com.amar.slackclone.workspace.WorkspaceMemberRepository.class),
                 mock(com.amar.slackclone.channel.ChannelMemberRepository.class),
-                mock(ChannelMessageReactionRepository.class), mock(ChannelMessageAttachmentRepository.class));
+                mock(ChannelMessageReactionRepository.class), mock(ChannelMessageAttachmentRepository.class),
+                mock(com.amar.slackclone.notification.NotificationService.class));
         sender = user(1L, "sender@example.com");
         Channel channel = new Channel(); ReflectionTestUtils.setField(channel, "id", 20L);
         message = new Message(); ReflectionTestUtils.setField(message, "id", 30L);

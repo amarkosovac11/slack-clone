@@ -57,10 +57,6 @@ public class ChannelAccessService {
             .findByIdAndWorkspaceId(channelId, workspaceId)
             .orElseThrow(() -> new ChannelNotFoundException(channelId));
 
-        if (channel.isArchived()) {
-            throw new ChannelConflictException("Channel is archived and unavailable");
-        }
-
         if (channel.isPrivateChannel()
             && !channelMemberRepository.existsByChannelIdAndUserId(
                 channelId,
@@ -71,6 +67,19 @@ public class ChannelAccessService {
             );
         }
 
+        return channel;
+    }
+
+    @Transactional(readOnly = true)
+    public Channel validateChannelWriteAccess(
+        Long workspaceId,
+        Long channelId,
+        String authenticatedEmail
+    ) {
+        Channel channel = validateChannelAccess(workspaceId, channelId, authenticatedEmail);
+        if (channel.isArchived()) {
+            throw new ChannelConflictException("Archived channels are read-only");
+        }
         return channel;
     }
 }

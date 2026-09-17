@@ -26,6 +26,7 @@ export class RegisterComponent {
   ) {
     this.form = this.formBuilder.nonNullable.group({
       displayName: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
+      username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(32), Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._]{2,31}$/)]],
       email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
       password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(72)]],
     });

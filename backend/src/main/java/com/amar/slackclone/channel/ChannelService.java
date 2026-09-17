@@ -17,6 +17,7 @@ import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.time.OffsetDateTime;
+import com.amar.slackclone.message.dto.MentionableUserResponse;
 
 @Service
 public class ChannelService {
@@ -26,19 +27,22 @@ public class ChannelService {
     private final UserRepository userRepository;
     private final ChannelMemberRepository channelMemberRepository;
     private final WorkspaceAccessService workspaceAccessService;
+    private final ChannelAccessService channelAccessService;
 
     public ChannelService(
             ChannelRepository channelRepository,
             ChannelMemberRepository channelMemberRepository,
             WorkspaceMemberRepository workspaceMemberRepository,
             UserRepository userRepository,
-            WorkspaceAccessService workspaceAccessService
+            WorkspaceAccessService workspaceAccessService,
+            ChannelAccessService channelAccessService
     ) {
         this.channelRepository = channelRepository;
         this.channelMemberRepository = channelMemberRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
         this.workspaceAccessService = workspaceAccessService;
+        this.channelAccessService = channelAccessService;
     }
 
     @Transactional
@@ -121,7 +125,7 @@ public class ChannelService {
         return toResponse(channel);
     }
     @Transactional(readOnly=true)
-    public List<ChannelResponse> getArchivedChannels(Long workspaceId,String email){requireManager(workspaceId,email);return channelRepository.findAllByWorkspaceIdAndArchivedAtIsNotNullOrderByArchivedAtDesc(workspaceId).stream().map(this::toResponse).toList();}
+    public List<ChannelResponse> getArchivedChannels(Long workspaceId,String email){WorkspaceMember member=workspaceAccessService.requireWorkspaceMember(workspaceId,email);return channelRepository.findVisibleArchivedChannels(workspaceId,member.getUser().getId()).stream().map(this::toResponse).toList();}
     @Transactional public ChannelResponse unarchiveChannel(Long workspaceId,Long channelId,String email){requireManager(workspaceId,email);Channel c=requireChannel(workspaceId,channelId);if(!c.isArchived())throw new ChannelConflictException("Channel is not archived");c.setArchivedAt(null);return toResponse(c);}
 
     @Transactional
@@ -268,8 +272,6 @@ public class ChannelService {
             );
         }
 
-        requireActive(channel);
-
         return channelMemberRepository
                 .findAllByChannelId(channelId)
                 .stream()
@@ -286,8 +288,20 @@ public class ChannelService {
                 user.getId(),
                 user.getDisplayName(),
                 user.getEmail(),
+                user.getUsername(),
+                user.getAvatarKey() == null ? null : "/api/users/avatars/" + user.getAvatarKey(),
                 membership.getJoinedAt()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<MentionableUserResponse> mentionableUsers(Long workspaceId, Long channelId, String email) {
+        Channel channel = channelAccessService.validateChannelAccess(workspaceId, channelId, email);
+        List<User> users = channel.isPrivateChannel()
+                ? channelMemberRepository.findAllByChannelId(channelId).stream().map(ChannelMember::getUser).toList()
+                : workspaceMemberRepository.findAllByWorkspaceId(workspaceId).stream().map(WorkspaceMember::getUser).toList();
+        return users.stream().map(user -> new MentionableUserResponse(user.getId(), user.getDisplayName(),
+                user.getUsername(), user.getAvatarKey() == null ? null : "/api/users/avatars/" + user.getAvatarKey())).toList();
     }
 
     private User getCurrentUser(String email) {

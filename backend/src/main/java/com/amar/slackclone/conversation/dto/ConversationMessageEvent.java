@@ -1,2 +1,6 @@
 package com.amar.slackclone.conversation.dto;
-public record ConversationMessageEvent(ConversationMessageEventType type, ConversationMessageResponse message) {}
+public record ConversationMessageEvent(
+    ConversationMessageEventType type,
+    ConversationMessageResponse message,
+    Long threadRootMessageId
+) {}

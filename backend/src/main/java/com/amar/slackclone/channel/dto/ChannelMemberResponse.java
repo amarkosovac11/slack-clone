@@ -6,6 +6,8 @@ public record ChannelMemberResponse(
         Long userId,
         String displayName,
         String email,
+        String username,
+        String avatarUrl,
         OffsetDateTime joinedAt
 ) {
 }

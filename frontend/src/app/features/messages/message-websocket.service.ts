@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 
 import { TokenService } from '../../core/auth/token.service';
-import { Message } from './message.models';
+import { ChannelMessageEvent } from './message.models';
 
 @Injectable({
   providedIn: 'root',
@@ -43,7 +43,7 @@ export class MessageWebSocketService {
   subscribeToChannel(
     workspaceId: number,
     channelId: number,
-    callback: (message: Message) => void,
+    callback: (event: ChannelMessageEvent) => void,
     typingCallback?: (event: { userId: number; displayName: string; typing: boolean }) => void,
   ): void {
     this.unsubscribeFromChannel();
@@ -55,7 +55,7 @@ export class MessageWebSocketService {
 
       this.subscription = this.client.subscribe(
         `/topic/workspaces/${workspaceId}/channels/${channelId}/messages`,
-        (frame: IMessage) => callback(JSON.parse(frame.body) as Message),
+        (frame: IMessage) => callback(JSON.parse(frame.body) as ChannelMessageEvent),
       );
       if (typingCallback) {
         this.typingSubscription = this.client.subscribe(

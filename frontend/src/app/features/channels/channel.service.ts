@@ -82,6 +82,7 @@ export class ChannelService {
     );
   }
   archivedChannels(workspaceId:number):Observable<Channel[]>{return this.http.get<Channel[]>(`${this.apiUrl}/${workspaceId}/channels/archived`);}
+  mentionableUsers(workspaceId:number,channelId:number):Observable<{userId:number;displayName:string;username:string;avatarUrl:string|null}[]>{return this.http.get<{userId:number;displayName:string;username:string;avatarUrl:string|null}[]>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/mentionable-users`);}
   unarchiveChannel(workspaceId:number,channelId:number):Observable<Channel>{return this.http.post<Channel>(`${this.apiUrl}/${workspaceId}/channels/${channelId}/unarchive`,{});}
 
   deleteChannel(workspaceId: number, channelId: number): Observable<void> {

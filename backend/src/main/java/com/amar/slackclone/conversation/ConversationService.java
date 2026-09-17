@@ -3,6 +3,7 @@ package com.amar.slackclone.conversation;
 import com.amar.slackclone.conversation.dto.*;
 import com.amar.slackclone.user.*;
 import com.amar.slackclone.workspace.WorkspaceMemberRepository;
+import com.amar.slackclone.notification.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,15 @@ public class ConversationService {
     private final SimpMessagingTemplate broker;
     private final ConversationMessageMentionRepository mentionRepository;
     private final ConversationMessageReactionRepository reactionRepository; private final ConversationMessageAttachmentRepository attachmentRepository;
+    private final NotificationService notificationService;
 
     public ConversationService(ConversationRepository conversations, ConversationParticipantRepository participants,
             ConversationMessageRepository messages, UserRepository users, WorkspaceMemberRepository workspaceMembers,
-            ConversationAccessService access, SimpMessagingTemplate broker, ConversationMessageMentionRepository mentionRepository,ConversationMessageReactionRepository reactionRepository,ConversationMessageAttachmentRepository attachmentRepository) {
+            ConversationAccessService access, SimpMessagingTemplate broker, ConversationMessageMentionRepository mentionRepository,ConversationMessageReactionRepository reactionRepository,ConversationMessageAttachmentRepository attachmentRepository,
+            NotificationService notificationService) {
         this.conversations = conversations; this.participants = participants; this.messages = messages;
         this.users = users; this.workspaceMembers = workspaceMembers; this.access = access; this.broker = broker; this.mentionRepository=mentionRepository;this.reactionRepository=reactionRepository;this.attachmentRepository=attachmentRepository;
+        this.notificationService=notificationService;
     }
 
     @Transactional
@@ -67,6 +71,8 @@ public class ConversationService {
         conversation = conversations.save(conversation); addParticipant(conversation, creator);
         for (User user : selected) addParticipant(conversation, user);
         participants.flush();
+        for (User user : selected) notificationService.create(user.getId(),creator.getId(),NotificationType.GROUP_DM_MEMBERSHIP,
+                creator.getDisplayName()+" added you to a group conversation",new NotificationService.Context(null,null,conversation.getId(),null,null));
         return response(conversation, creator);
     }
 
@@ -113,11 +119,11 @@ public class ConversationService {
             throw new ConversationValidationException("A group needs at least two active participants to send messages");
         ConversationMessage message = new ConversationMessage(); message.setConversation(conversation);
         message.setSender(senderMembership.getUser()); message.setContent(request.content().trim());
-        message = messages.saveAndFlush(message); persistMentions(message); senderMembership.setLastReadMessage(message); conversation.touch();
+        message = messages.saveAndFlush(message); persistMentions(message,true); senderMembership.setLastReadMessage(message); conversation.touch();
         participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(id).forEach(participant -> participant.setHiddenAt(null));
         ConversationMessageResponse result = messageResponse(message);
         List<UserConversationUpdate> updates = conversationUpdates(conversation);
-        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.CREATED, result), updates);
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.MESSAGE_CREATED, result, null), updates);
         return result;
     }
 
@@ -144,9 +150,9 @@ public class ConversationService {
         String content = request.content() == null ? "" : request.content().trim();
         if (content.isEmpty()) throw new ConversationValidationException("Message content cannot be empty");
         message.edit(content);
-        mentionRepository.deleteAllByMessageId(messageId); persistMentions(message);
+        mentionRepository.deleteAllByMessageId(messageId); persistMentions(message,false);
         ConversationMessageResponse result = messageResponse(message);
-        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.UPDATED, result),
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.MESSAGE_UPDATED, result, null),
                 conversationUpdates(participant.getConversation()));
         return result;
     }
@@ -160,7 +166,7 @@ public class ConversationService {
         message.softDelete();
         mentionRepository.deleteAllByMessageId(messageId);
         ConversationMessageResponse result = messageResponse(message);
-        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.DELETED, result),
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.MESSAGE_DELETED, result, null),
                 conversationUpdates(participant.getConversation()));
         return result;
     }
@@ -203,10 +209,11 @@ public class ConversationService {
 
     @Transactional(readOnly = true)
     public List<ConversationParticipantResponse> participants(Long id, String email) {
-        Conversation conversation = requireGroup(access.requireParticipant(id, email).getConversation());
+        Conversation conversation = access.requireParticipant(id, email).getConversation();
         return participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(id).stream()
                 .map(member -> new ConversationParticipantResponse(member.getUser().getId(), member.getUser().getDisplayName(),
-                        null, member.getJoinedAt(), member.getUser().getId().equals(conversation.getCreatedBy().getId()) ? "CREATOR" : "MEMBER"))
+                        member.getUser().getUsername(), member.getUser().getAvatarKey() == null ? null : "/api/users/avatars/" + member.getUser().getAvatarKey(),
+                        member.getJoinedAt(), member.getUser().getId().equals(conversation.getCreatedBy().getId()) ? "CREATOR" : "MEMBER"))
                 .toList();
     }
 
@@ -241,6 +248,8 @@ public class ConversationService {
             });
             membership.setJoinedAt(now); membership.setLeftAt(null); membership.setHiddenAt(null); membership.setLastReadMessage(null);
             participants.save(membership);
+            notificationService.create(target.getId(),requester.getUser().getId(),NotificationType.GROUP_DM_MEMBERSHIP,
+                    requester.getUser().getDisplayName()+" added you to a group conversation",new NotificationService.Context(null,null,id,null,null));
         }
         conversation.touch(); participants.flush();
         ConversationResponse result = response(conversation, requester.getUser());
@@ -260,6 +269,8 @@ public class ConversationService {
                 .filter(ConversationParticipant::isActive)
                 .orElseThrow(() -> new ConversationValidationException("User is not an active participant"));
         deactivate(target); conversation.touch();
+        notificationService.create(target.getUser().getId(),requester.getUser().getId(),NotificationType.GROUP_DM_MEMBERSHIP,
+                requester.getUser().getDisplayName()+" removed you from a group conversation",new NotificationService.Context(null,null,id,null,null));
         broadcastMembershipAfterCommit(conversation, "PARTICIPANT_REMOVED", userId);
     }
 
@@ -269,7 +280,7 @@ public class ConversationService {
         Conversation conversation = requireGroup(requester.getConversation());
         long activeCount = participants.countByConversationIdAndLeftAtIsNull(id);
         if (requester.getUser().getId().equals(conversation.getCreatedBy().getId()) && activeCount > 1)
-            throw new ConversationValidationException("Transfer of group ownership is not supported yet");
+            throw new ConversationValidationException("Transfer creator before leaving the group");
         deactivate(requester); conversation.touch();
         broadcastMembershipAfterCommit(conversation, "PARTICIPANT_LEFT", requester.getUser().getId());
     }
@@ -325,12 +336,12 @@ public class ConversationService {
         return new ConversationResponse(conversation.getId(), conversation.getType(), people, conversation.getCustomName(), name, last, unread,
                 conversation.getCreatedAt(), conversation.getUpdatedAt());
     }
-    private ConversationUserResponse userResponse(User u) { return new ConversationUserResponse(u.getId(), u.getDisplayName(), u.getEmail()); }
+    private ConversationUserResponse userResponse(User u) { return new ConversationUserResponse(u.getId(), u.getDisplayName(), u.getEmail(), u.getUsername(), u.getAvatarKey() == null ? null : "/api/users/avatars/" + u.getAvatarKey()); }
     private ConversationMessageResponse messageResponse(ConversationMessage m) { return messageResponse(m,null); }
     private ConversationMessageResponse messageResponse(ConversationMessage m,Long viewerId) {
         return new ConversationMessageResponse(m.getId(), m.getConversation().getId(), m.getSender().getId(),
                 m.getSender().getDisplayName(), m.getContent(), m.getCreatedAt(), m.getUpdatedAt(), m.getDeletedAt(), mentionRepository.findAllByMessageId(m.getId()).stream().map(x -> {
-                    User u=x.getUser(); return new com.amar.slackclone.message.dto.MentionResponse(u.getId(),u.getDisplayName(),handle(u)); }).toList(),m.getThreadRootMessage()==null?null:m.getThreadRootMessage().getId(),messages.countByThreadRootMessageId(m.getId()),conversationReactions(m.getId(),viewerId),conversationAttachments(m.getId()));
+                    User u=x.getUser(); return new com.amar.slackclone.message.dto.MentionResponse(u.getId(),u.getDisplayName(),u.getUsername()); }).toList(),m.getThreadRootMessage()==null?null:m.getThreadRootMessage().getId(),messages.countByThreadRootMessageId(m.getId()),conversationReactions(m.getId(),viewerId),conversationAttachments(m.getId()));
     }
     private ConversationMessage requireMessage(Long conversationId, Long messageId) {
         return messages.findByIdAndConversationId(messageId, conversationId)
@@ -366,12 +377,22 @@ public class ConversationService {
                 ConversationListEvent.upsert(update.response())));
     }
     private static final java.util.regex.Pattern MENTION=java.util.regex.Pattern.compile("(?<![\\w@])@([A-Za-z0-9._-]+)");
-    private void persistMentions(ConversationMessage message) { var eligible=participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(message.getConversation().getId()).stream().map(ConversationParticipant::getUser).toList(); var grouped=eligible.stream().collect(java.util.stream.Collectors.groupingBy(u->handle(u).toLowerCase(java.util.Locale.ROOT))); var matcher=MENTION.matcher(message.getContent()); Set<Long> seen=new HashSet<>(); while(matcher.find()){var found=grouped.get(matcher.group(1).toLowerCase(java.util.Locale.ROOT));if(found!=null&&found.size()==1&&seen.add(found.getFirst().getId()))mentionRepository.save(new ConversationMessageMention(message,found.getFirst()));}}
-    private String handle(User u){return u.getEmail().substring(0,u.getEmail().indexOf('@'));}
-    @Transactional public ConversationMessageResponse addReaction(Long id,Long messageId,String emoji,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage m=requireMessage(id,messageId);if(m.getDeletedAt()!=null)throw new ConversationValidationException("Deleted messages cannot receive reactions");reactionRepository.findByMessageIdAndUserIdAndEmoji(messageId,p.getUser().getId(),emoji).orElseGet(()->reactionRepository.save(new ConversationMessageReaction(m,p.getUser(),emoji)));ConversationMessageResponse r=messageResponse(m,p.getUser().getId());broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.UPDATED,r),conversationUpdates(p.getConversation()));return r;}
-    @Transactional public ConversationMessageResponse removeReaction(Long id,Long messageId,String emoji,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage m=requireMessage(id,messageId);reactionRepository.findByMessageIdAndUserIdAndEmoji(messageId,p.getUser().getId(),emoji).ifPresent(reactionRepository::delete);ConversationMessageResponse r=messageResponse(m,p.getUser().getId());broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.UPDATED,r),conversationUpdates(p.getConversation()));return r;}
+    private void persistMentions(ConversationMessage message,boolean notify) { var eligible=participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(message.getConversation().getId()).stream().map(ConversationParticipant::getUser).toList(); var grouped=eligible.stream().collect(java.util.stream.Collectors.groupingBy(u->u.getUsername().toLowerCase(java.util.Locale.ROOT))); var matcher=MENTION.matcher(message.getContent()); Set<Long> seen=new HashSet<>(); while(matcher.find()){var found=grouped.get(matcher.group(1).toLowerCase(java.util.Locale.ROOT));if(found!=null&&found.size()==1&&seen.add(found.getFirst().getId())){User mentioned=found.getFirst();mentionRepository.save(new ConversationMessageMention(message,mentioned));if(notify)notificationService.create(mentioned.getId(),message.getSender().getId(),NotificationType.MENTION,message.getSender().getDisplayName()+" mentioned you in a conversation",new NotificationService.Context(null,null,message.getConversation().getId(),null,message.getId()));}}}
+    @Transactional public ConversationMessageResponse addReaction(Long id,Long messageId,String emoji,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage m=requireMessage(id,messageId);if(m.getDeletedAt()!=null)throw new ConversationValidationException("Deleted messages cannot receive reactions");reactionRepository.findByMessageIdAndUserIdAndEmoji(messageId,p.getUser().getId(),emoji).orElseGet(()->reactionRepository.save(new ConversationMessageReaction(m,p.getUser(),emoji)));ConversationMessageResponse r=messageResponse(m);broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.REACTION_UPDATED,r,m.getThreadRootMessage()==null?null:m.getThreadRootMessage().getId()),conversationUpdates(p.getConversation()));return messageResponse(m,p.getUser().getId());}
+    @Transactional public ConversationMessageResponse removeReaction(Long id,Long messageId,String emoji,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage m=requireMessage(id,messageId);reactionRepository.findByMessageIdAndUserIdAndEmoji(messageId,p.getUser().getId(),emoji).ifPresent(reactionRepository::delete);ConversationMessageResponse r=messageResponse(m);broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.REACTION_UPDATED,r,m.getThreadRootMessage()==null?null:m.getThreadRootMessage().getId()),conversationUpdates(p.getConversation()));return messageResponse(m,p.getUser().getId());}
     @Transactional(readOnly=true) public List<ConversationMessageResponse> thread(Long id,Long messageId,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage target=requireMessage(id,messageId),root=target.getThreadRootMessage()==null?target:target.getThreadRootMessage();if(root.getCreatedAt().isBefore(p.getJoinedAt()))throw new ConversationAccessDeniedException("Thread predates your membership");List<ConversationMessageResponse> out=new ArrayList<>();out.add(messageResponse(root));out.addAll(messages.findAllByThreadRootMessageIdAndCreatedAtGreaterThanEqualOrderByCreatedAt(root.getId(),p.getJoinedAt()).stream().map(this::messageResponse).toList());return out;}
-    @Transactional public ConversationMessageResponse reply(Long id,Long messageId,CreateConversationMessageRequest req,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage target=requireMessage(id,messageId),root=target.getThreadRootMessage()==null?target:target.getThreadRootMessage();if(root.getCreatedAt().isBefore(p.getJoinedAt()))throw new ConversationAccessDeniedException("Thread predates your membership");ConversationMessage r=new ConversationMessage();r.setConversation(p.getConversation());r.setSender(p.getUser());r.setContent(req.content().trim());r.setThreadRootMessage(root);r=messages.saveAndFlush(r);persistMentions(r);ConversationMessageResponse result=messageResponse(r);broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.UPDATED,messageResponse(root)),conversationUpdates(p.getConversation()));return result;}
-    private List<com.amar.slackclone.message.dto.ReactionSummary> conversationReactions(Long id,Long viewerId){return reactionRepository.findAllByMessageId(id).stream().collect(java.util.stream.Collectors.groupingBy(ConversationMessageReaction::getEmoji)).entrySet().stream().map(e->new com.amar.slackclone.message.dto.ReactionSummary(e.getKey(),e.getValue().size(),viewerId!=null&&e.getValue().stream().anyMatch(x->x.getUser().getId().equals(viewerId)),e.getValue().stream().limit(20).map(x->x.getUser().getDisplayName()).toList())).toList();}
+    @Transactional public ConversationMessageResponse reply(Long id,Long messageId,CreateConversationMessageRequest req,String email){ConversationParticipant p=access.requireParticipant(id,email);ConversationMessage target=requireMessage(id,messageId),root=target.getThreadRootMessage()==null?target:target.getThreadRootMessage();if(root.getCreatedAt().isBefore(p.getJoinedAt()))throw new ConversationAccessDeniedException("Thread predates your membership");ConversationMessage r=new ConversationMessage();r.setConversation(p.getConversation());r.setSender(p.getUser());r.setContent(req.content().trim());r.setThreadRootMessage(root);r=messages.saveAndFlush(r);persistMentions(r,true);notificationService.create(root.getSender().getId(),p.getUser().getId(),NotificationType.THREAD_REPLY,p.getUser().getDisplayName()+" replied to your thread",new NotificationService.Context(null,null,id,null,root.getId()));ConversationMessageResponse result=messageResponse(r);broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.THREAD_REPLY_CREATED,result,root.getId()),conversationUpdates(p.getConversation()));broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.THREAD_UPDATED,messageResponse(root),root.getId()),conversationUpdates(p.getConversation()));return result;}
+
+    @Transactional
+    public ConversationMessageResponse attachmentAdded(Long conversationId, Long messageId, String email) {
+        ConversationParticipant participant = access.requireParticipant(conversationId, email);
+        ConversationMessage message = requireMessage(conversationId, messageId);
+        ConversationMessageResponse response = messageResponse(message);
+        broadcastAfterCommit(new ConversationMessageEvent(ConversationMessageEventType.ATTACHMENT_ADDED, response,
+            message.getThreadRootMessage() == null ? null : message.getThreadRootMessage().getId()),
+            conversationUpdates(participant.getConversation()));
+        return response;
+    }
+    private List<com.amar.slackclone.message.dto.ReactionSummary> conversationReactions(Long id,Long viewerId){return reactionRepository.findAllByMessageId(id).stream().collect(java.util.stream.Collectors.groupingBy(ConversationMessageReaction::getEmoji)).entrySet().stream().map(e->new com.amar.slackclone.message.dto.ReactionSummary(e.getKey(),e.getValue().size(),e.getValue().stream().map(x->x.getUser().getId()).toList(),e.getValue().stream().limit(20).map(x->x.getUser().getDisplayName()).toList())).toList();}
     private List<com.amar.slackclone.message.dto.AttachmentResponse> conversationAttachments(Long id){return attachmentRepository.findAllByMessageId(id).stream().map(a->new com.amar.slackclone.message.dto.AttachmentResponse(a.getId(),a.getOriginalFileName(),a.getMimeType(),a.getFileSize(),"/api/attachments/conversation/"+a.getId())).toList();}
 }

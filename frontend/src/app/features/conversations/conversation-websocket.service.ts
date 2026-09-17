@@ -52,4 +52,4 @@ export class ConversationWebSocketService {
     if(desired.typingCallback)this.typingSubscription=this.client.subscribe(`/topic/users/${desired.userId}/conversations/${desired.id}/typing`,frame=>desired.typingCallback!(JSON.parse(frame.body))); }
 }
 
-export interface UserProfileEvent { type:'PROFILE_UPDATED'|'STATUS_UPDATED'|'PRESENCE_UPDATED';userId:number;displayName:string;title:string|null;avatarUrl:string|null;customStatusText:string|null;customStatusEmoji:string|null;customStatusExpiresAt:string|null;presence:'ONLINE'|'AWAY'|'OFFLINE'|null;lastSeenAt:string|null; }
+export interface UserProfileEvent { type:'PROFILE_UPDATED'|'STATUS_UPDATED'|'PRESENCE_UPDATED';userId:number;displayName:string;username:string;title:string|null;avatarUrl:string|null;customStatusText:string|null;customStatusEmoji:string|null;customStatusExpiresAt:string|null;presence:'ONLINE'|'AWAY'|'OFFLINE'|null;lastSeenAt:string|null; }

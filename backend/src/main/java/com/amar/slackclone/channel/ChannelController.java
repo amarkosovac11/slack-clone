@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import com.amar.slackclone.channel.dto.AddChannelMemberRequest;
 
 import java.util.List;
+import com.amar.slackclone.message.dto.MentionableUserResponse;
 
 @RestController
 @RequestMapping("/api/workspaces/{workspaceId}/channels")
@@ -80,6 +81,12 @@ public class ChannelController {
                                 authentication.getName());
 
                 return ResponseEntity.ok(members);
+        }
+
+        @GetMapping("/{channelId}/mentionable-users")
+        public List<MentionableUserResponse> mentionableUsers(@PathVariable Long workspaceId,
+                        @PathVariable Long channelId, Authentication authentication) {
+                return channelService.mentionableUsers(workspaceId, channelId, authentication.getName());
         }
 
         @DeleteMapping("/{channelId}/members/{userId}")

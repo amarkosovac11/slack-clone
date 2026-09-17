@@ -5,6 +5,20 @@
     background: #f5f3ff;
 }
 
+.notification-bell { position: relative; flex: 0 0 auto; }
+.notification-bell span { position: absolute; top: -7px; right: -7px; min-width: 18px; border-radius: 999px; background: #d92d20; color: white; font-size: 11px; padding: 2px 5px; }
+.notification-panel { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; right: 0; max-height: 430px; overflow: auto; padding: 12px; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 14px 32px rgba(0,0,0,.18); }
+.notification-panel header { display: flex; justify-content: space-between; align-items: center; }
+.notification-item { width: 100%; display: flex; gap: 10px; text-align: left; padding: 10px; background: transparent; border: 0; border-radius: 8px; }
+.notification-item.unread { background: #eef4ff; }
+.notification-item img, .mention-autocomplete img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.notification-item span, .mention-autocomplete span { display: grid; gap: 2px; }
+.mention-autocomplete { position: absolute; z-index: 35; bottom: 100%; left: 12px; width: min(360px, calc(100% - 24px)); max-height: 260px; overflow: auto; padding: 6px; border: 1px solid #ddd; border-radius: 10px; background: white; box-shadow: 0 10px 28px rgba(0,0,0,.16); }
+.mention-autocomplete button { width: 100%; display: flex; gap: 10px; align-items: center; padding: 8px; border: 0; background: transparent; text-align: left; border-radius: 7px; }
+.mention-autocomplete button.active, .mention-autocomplete button:hover { background: #eef4ff; }
+.attachment-image-button { padding: 0; border: 0; background: transparent; }
+.archived-readonly-notice { padding: 14px; border-top: 1px solid #ddd; color: #666; text-align: center; }
+
 input {
     flex: 1;
     min-width: 0;
