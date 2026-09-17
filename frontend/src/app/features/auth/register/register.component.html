@@ -13,6 +13,12 @@
         <small class="field-error">Display name must have between 2 and 100 characters.</small>
       }
 
+      <label for="username">Username</label>
+      <input id="username" type="text" formControlName="username" placeholder="amar.k" autocomplete="username" />
+      @if (form.controls.username.touched && form.controls.username.invalid) {
+        <small class="field-error">Use 3–32 letters, numbers, dots, or underscores.</small>
+      }
+
       <label for="email">Email</label>
       <input id="email" type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
       @if (form.controls.email.touched && form.controls.email.invalid) {

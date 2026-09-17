@@ -10,13 +10,16 @@ import { AuthService } from '../../../core/auth/auth.service';
 
 import { Channel, ChannelMember } from '../../channels/channel.models';
 import { ChannelService } from '../../channels/channel.service';
-import { Message, PinnedMessage } from '../../messages/message.models';
+import { Attachment, ChannelMessageEvent, Message, PinnedMessage, ReactionSummary } from '../../messages/message.models';
 import { MessageService } from '../../messages/message.service';
+import { AttachmentService } from '../../messages/attachment.service';
 import { MessageWebSocketService } from '../../messages/message-websocket.service';
 import { Conversation, ConversationMessage, ConversationParticipant, ConversationUser } from '../../conversations/conversation.models';
 import { ConversationService } from '../../conversations/conversation.service';
 import { ConversationWebSocketService } from '../../conversations/conversation-websocket.service';
 import { SearchHit, SearchService } from '../../search/search.service';
+import { AppNotification } from '../../notifications/notification.models';
+import { NotificationService } from '../../notifications/notification.service';
 
 import { PendingWorkspaceInvitationsComponent } from '../pending-workspace-invitations/pending-workspace-invitations.component';
 import { WorkspaceInvitationManagementComponent } from '../workspace-invitation-management/workspace-invitation-management.component';
@@ -52,6 +55,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly showProfilePlaceholder = signal(false);
   readonly showProfileModal = signal(false);
   readonly showStatusModal = signal(false);
+  readonly showNotifications=signal(false);
   readonly profileSaving = signal(false);
   readonly profileError = signal<string | null>(null);
   readonly userPresence = signal<Record<number,'ONLINE'|'AWAY'|'OFFLINE'>>({});
@@ -144,6 +148,13 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly searchResults=signal<SearchHit[]>([]); readonly searchOpen=signal(false); readonly searchLoading=signal(false);
   readonly typingNames=signal<string[]>([]); readonly channelThread=signal<Message[]>([]); readonly conversationThread=signal<ConversationMessage[]>([]);
   readonly threadRootId=signal<number|null>(null); readonly selectedFile=signal<File|null>(null);
+  readonly attachmentObjectUrls=signal<Record<string,string>>({});
+  readonly mentionCandidates=signal<{userId:number;displayName:string;username:string;avatarUrl:string|null}[]>([]);
+  readonly mentionSuggestions=signal<{userId:number;displayName:string;username:string;avatarUrl:string|null}[]>([]);
+  readonly mentionActiveIndex=signal(0);
+  private mentionRange:{start:number;end:number;kind:'channel'|'conversation'}|null=null;
+  private readonly createdObjectUrls=new Set<string>();
+  private attachmentGeneration=0;
   private searchTimer:ReturnType<typeof setTimeout>|null=null; private typingTimer:ReturnType<typeof setTimeout>|null=null;
   readonly searchForm=this.formBuilder.nonNullable.group({query:['']});
   readonly threadReplyForm=this.formBuilder.nonNullable.group({content:['',[Validators.required,Validators.maxLength(4000)]]});
@@ -226,7 +237,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     name: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(100)]],
     description: ['', [Validators.maxLength(255)]],
   });
-  readonly profileForm=this.formBuilder.nonNullable.group({displayName:['',[Validators.required,Validators.maxLength(100)]],title:['',[Validators.maxLength(120)]]});
+  readonly profileForm=this.formBuilder.nonNullable.group({displayName:['',[Validators.required,Validators.maxLength(100)]],username:['',[Validators.required,Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._]{2,31}$/)]],title:['',[Validators.maxLength(120)]]});
   readonly statusForm=this.formBuilder.nonNullable.group({emoji:['',[Validators.maxLength(32)]],text:['',[Validators.maxLength(100)]],expiresAt:['']});
   readonly passwordForm=this.formBuilder.nonNullable.group({currentPassword:['',[Validators.required]],newPassword:['',[Validators.required,Validators.minLength(8),Validators.maxLength(72)]]});
 
@@ -241,6 +252,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     private readonly conversationService: ConversationService,
     private readonly conversationWebSocketService: ConversationWebSocketService,
     private readonly searchService:SearchService,
+    private readonly attachmentService:AttachmentService,
+    readonly notificationService:NotificationService,
   ) {
     this.currentUser = this.authService.currentUser;
     this.webSocketConnected = this.messageWebSocketService.connected;
@@ -327,7 +340,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
     this.loadWorkspaces();
     this.loadConversations();
-    this.authService.loadProfile().subscribe({next:user=>{this.subscribeToProfileEvents(user.id);this.profileForm.reset({displayName:user.displayName,title:user.title??''});},error:()=>{}});
+    this.authService.loadProfile().subscribe({next:user=>{this.subscribeToProfileEvents(user.id);this.notificationService.initialize(user.id);this.profileForm.reset({displayName:user.displayName,username:user.username,title:user.title??''});},error:()=>{}});
     ['pointerdown','keydown','focus'].forEach(name=>window.addEventListener(name,this.activityHandler));
   }
 
@@ -335,21 +348,33 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     if(this.searchTimer)clearTimeout(this.searchTimer); if(this.typingTimer)clearTimeout(this.typingTimer);
     this.messageWebSocketService.disconnect();
     this.conversationWebSocketService.disconnect();
+    this.notificationService.disconnect();
     ['pointerdown','keydown','focus'].forEach(name=>window.removeEventListener(name,this.activityHandler));
     if(this.activityTimer)clearTimeout(this.activityTimer);
+    this.clearAttachmentObjectUrls();
   }
 
   onSearchInput():void{if(this.searchTimer)clearTimeout(this.searchTimer);const q=this.searchForm.getRawValue().query.trim();if(q.length<2){this.searchResults.set([]);this.searchOpen.set(false);return;}this.searchTimer=setTimeout(()=>{this.searchLoading.set(true);this.searchService.search(q,this.selectedWorkspaceId()).subscribe({next:r=>{this.searchResults.set(r.results);this.searchOpen.set(true);this.searchLoading.set(false);},error:()=>this.searchLoading.set(false)});},300);}
   openSearchHit(hit:SearchHit):void{this.searchOpen.set(false);if(hit.channelId&&this.selectedWorkspaceId())void this.router.navigate(['/workspaces',this.selectedWorkspaceId(),'channels',hit.channelId]);else if(hit.conversationId)this.openConversation(hit.conversationId);}
+  openNotification(item:AppNotification):void{this.notificationService.markRead(item);this.showNotifications.set(false);if(item.conversationId){this.openConversation(item.conversationId);if(item.type==='THREAD_REPLY'&&item.conversationMessageId)setTimeout(()=>{const message=this.conversationMessages().find(x=>x.id===item.conversationMessageId);if(message)this.openConversationThread(message);},300);return;}if(item.workspaceId&&item.channelId){void this.router.navigate(['/workspaces',item.workspaceId,'channels',item.channelId]);if(item.type==='THREAD_REPLY'&&item.channelMessageId)setTimeout(()=>{const message=this.messages().find(x=>x.id===item.channelMessageId);if(message)this.openChannelThread(message);},500);}}
   chooseFile(event:Event):void{this.selectedFile.set((event.target as HTMLInputElement).files?.[0]??null);}
-  attachmentUrl(url:string):string{return url.startsWith('http')?url:`http://localhost:8080${url}`;}
-  toggleChannelReaction(message:Message,emoji:string):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;const own=message.reactions.find(r=>r.emoji===emoji)?.reactedByCurrentUser;const call=own?this.messageService.unreact(w,c.id,message.id,emoji):this.messageService.react(w,c.id,message.id,emoji);call.subscribe(updated=>this.upsertMessage(updated));}
-  toggleConversationReaction(message:ConversationMessage,emoji:string):void{const c=this.selectedConversation();if(!c)return;const own=message.reactions.find(r=>r.emoji===emoji)?.reactedByCurrentUser;const call=own?this.conversationService.unreact(c.id,message.id,emoji):this.conversationService.react(c.id,message.id,emoji);call.subscribe(updated=>this.upsertConversationMessage(updated));}
+  attachmentUrl(attachment:Attachment):string|null{const key=this.attachmentKey(attachment);const existing=this.attachmentObjectUrls()[key];if(!existing)this.loadAttachment(attachment);return existing??null;}
+  downloadAttachment(attachment:Attachment):void{this.attachmentService.load(attachment.downloadUrl).subscribe(blob=>{const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=attachment.originalFileName;anchor.click();URL.revokeObjectURL(url);});}
+  private attachmentKey(attachment:Attachment):string{return `${attachment.downloadUrl}:${attachment.id}`;}
+  private loadAttachment(attachment:Attachment):void{const key=this.attachmentKey(attachment);if(this.attachmentObjectUrls()[key]!==undefined)return;const generation=this.attachmentGeneration;this.attachmentObjectUrls.update(v=>({...v,[key]:''}));this.attachmentService.load(attachment.downloadUrl).subscribe({next:blob=>{const url=URL.createObjectURL(blob);if(generation!==this.attachmentGeneration){URL.revokeObjectURL(url);return;}this.createdObjectUrls.add(url);this.attachmentObjectUrls.update(v=>({...v,[key]:url}));},error:()=>this.attachmentObjectUrls.update(v=>{const copy={...v};delete copy[key];return copy;})});}
+  private clearAttachmentObjectUrls():void{this.attachmentGeneration++;this.createdObjectUrls.forEach(url=>URL.revokeObjectURL(url));this.createdObjectUrls.clear();this.attachmentObjectUrls.set({});}
+  reactedByCurrentUser(reaction:ReactionSummary|{userIds:number[]}):boolean{return reaction.userIds.includes(this.currentUser()?.id??-1);}
+  toggleChannelReaction(message:Message,emoji:string):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c||c.archivedAt)return;const own=this.reactedByCurrentUser(message.reactions.find(r=>r.emoji===emoji)??{userIds:[]});const call=own?this.messageService.unreact(w,c.id,message.id,emoji):this.messageService.react(w,c.id,message.id,emoji);call.subscribe(updated=>this.upsertMessage(updated));}
+  toggleConversationReaction(message:ConversationMessage,emoji:string):void{const c=this.selectedConversation();if(!c)return;const own=this.reactedByCurrentUser(message.reactions.find(r=>r.emoji===emoji)??{userIds:[]});const call=own?this.conversationService.unreact(c.id,message.id,emoji):this.conversationService.react(c.id,message.id,emoji);call.subscribe(updated=>this.upsertConversationMessage(updated));}
   openChannelThread(message:Message):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;this.threadRootId.set(message.id);this.conversationThread.set([]);this.messageService.thread(w,c.id,message.id).subscribe(x=>this.channelThread.set(x));}
   openConversationThread(message:ConversationMessage):void{const c=this.selectedConversation();if(!c)return;this.threadRootId.set(message.id);this.channelThread.set([]);this.conversationService.thread(c.id,message.id).subscribe(x=>this.conversationThread.set(x));}
   closeThread():void{this.threadRootId.set(null);this.channelThread.set([]);this.conversationThread.set([]);this.threadReplyForm.reset({content:''});}
   sendThreadReply():void{const root=this.threadRootId(),content=this.threadReplyForm.getRawValue().content.trim();if(!root||!content)return;const w=this.selectedWorkspaceId(),channel=this.selectedChannel(),conversation=this.selectedConversation();if(channel&&w)this.messageService.reply(w,channel.id,root,content).subscribe(m=>{this.channelThread.update(x=>[...x,m]);this.threadReplyForm.reset({content:''});});else if(conversation)this.conversationService.reply(conversation.id,root,content).subscribe(m=>{this.conversationThread.update(x=>[...x,m]);this.threadReplyForm.reset({content:''});});}
   onTyping(kind:'channel'|'conversation'):void{if(kind==='channel'){const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(w&&c)this.messageWebSocketService.sendTyping(w,c.id,true);}else{const c=this.selectedConversation();if(c)this.conversationWebSocketService.sendTyping(c.id,true);}if(this.typingTimer)clearTimeout(this.typingTimer);this.typingTimer=setTimeout(()=>{const w=this.selectedWorkspaceId(),c=this.selectedChannel(),dm=this.selectedConversation();if(kind==='channel'&&w&&c)this.messageWebSocketService.sendTyping(w,c.id,false);if(kind==='conversation'&&dm)this.conversationWebSocketService.sendTyping(dm.id,false);},1500);}
+  onComposerInput(kind:'channel'|'conversation',event:Event):void{this.onTyping(kind);const input=event.target as HTMLTextAreaElement;const cursor=input.selectionStart??input.value.length;const match=input.value.slice(0,cursor).match(/(?:^|\s)@([A-Za-z0-9._]*)$/);if(!match){this.closeMentionSuggestions();return;}const query=match[1].toLowerCase();const start=cursor-query.length-1;this.mentionRange={start,end:cursor,kind};this.mentionSuggestions.set(this.mentionCandidates().filter(u=>u.username.toLowerCase().startsWith(query)).slice(0,8));this.mentionActiveIndex.set(0);}
+  mentionKeydown(event:KeyboardEvent):void{const options=this.mentionSuggestions();if(!options.length)return;if(event.key==='Escape'){event.preventDefault();this.closeMentionSuggestions();return;}if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();this.mentionActiveIndex.update(i=>(i+(event.key==='ArrowDown'?1:-1)+options.length)%options.length);return;}if(event.key==='Enter'){event.preventDefault();this.selectMention(options[this.mentionActiveIndex()]);}}
+  selectMention(user:{username:string}):void{const range=this.mentionRange;if(!range)return;const control=range.kind==='channel'?this.messageForm.controls.content:this.conversationMessageForm.controls.content;const value=control.value;control.setValue(value.slice(0,range.start)+`@${user.username} `+value.slice(range.end));this.closeMentionSuggestions();}
+  private closeMentionSuggestions():void{this.mentionSuggestions.set([]);this.mentionRange=null;}
   private handleTyping(event:{userId:number;displayName:string;typing:boolean}):void{if(event.userId===this.currentUser()?.id)return;this.typingNames.update(names=>event.typing?[...new Set([...names,event.displayName])]:names.filter(n=>n!==event.displayName));}
 
   selectWorkspace(workspaceId: number): void {
@@ -577,12 +602,13 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   restoreConversation(c:Conversation):void{this.conversationService.restore(c.id).subscribe(x=>{this.hiddenConversations.update(items=>items.filter(i=>i.id!==c.id));this.upsertConversation(x);});}
   openArchivedChannels():void{const id=this.selectedWorkspaceId();if(!id)return;this.showArchivedChannels.set(true);this.channelService.archivedChannels(id).subscribe(x=>this.archivedChannels.set(x));}
   unarchiveChannel(c:Channel):void{const id=this.selectedWorkspaceId();if(!id)return;this.channelService.unarchiveChannel(id,c.id).subscribe(x=>{this.archivedChannels.update(items=>items.filter(i=>i.id!==c.id));this.channels.update(items=>[...items,x]);});}
+  openArchivedChannel(c:Channel):void{const workspaceId=this.selectedWorkspaceId();if(!workspaceId)return;this.showArchivedChannels.set(false);this.closeConversationSelection();this.selectedChannel.set(c);this.loadMessages(workspaceId,c.id);}
   openPinnedMessages():void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;this.showPinnedMessages.set(true);this.messageService.pins(w,c.id).subscribe(x=>this.pinnedMessages.set(x));}
   togglePin(message:Message):void{const w=this.selectedWorkspaceId(),c=this.selectedChannel();if(!w||!c)return;const request:Observable<unknown>=message.pinned?this.messageService.unpin(w,c.id,message.id):this.messageService.pin(w,c.id,message.id);request.subscribe(()=>{this.messages.update(items=>items.map(x=>x.id===message.id?{...x,pinned:!x.pinned}:x));if(this.showPinnedMessages())this.openPinnedMessages();});}
 
   openConversation(id: number, navigate = true): void {
     if (this.selectedConversation()?.id === id && !navigate) return;
-    this.messageWebSocketService.unsubscribeFromChannel();
+    this.messageWebSocketService.unsubscribeFromChannel();this.clearAttachmentObjectUrls();
     this.selectedChannel.set(null); this.messages.set([]); this.conversationError.set(null);
     this.conversationLoading.set(true); this.conversationMessages.set([]); this.conversationCursor.set(null);
     this.conversationService.get(id).subscribe({
@@ -592,11 +618,12 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         if (!userId) return;
         this.conversationWebSocketService.subscribeToConversation(id, userId, event => {
           if (this.selectedConversation()?.id === id) {
-            this.upsertConversationMessage(event.message);
-            if (event.type === 'CREATED') this.markConversationRead(id);
+            this.handleConversationMessageEvent(event);
+            if (event.type === 'MESSAGE_CREATED') this.markConversationRead(id);
           }
         }, event => { if (this.selectedConversation()?.id === id) { this.refreshSelectedConversation(id); if(event.type==='READ_UPDATED')this.refreshReceipts(id); if (this.showGroupMembersModal()) this.loadGroupMembers(id); } }, event=>this.handleTyping(event));
         this.loadConversationHistory(id);
+        this.conversationService.participants(id).subscribe(members=>this.mentionCandidates.set(members.map(member=>({userId:member.userId,displayName:member.displayName,username:member.username,avatarUrl:member.avatarUrl}))));
         this.markConversationRead(id);
         if (navigate) void this.router.navigate(['/conversations', id]);
       },
@@ -662,9 +689,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
   }
   avatarSrc(url:string|null|undefined):string|null{return url?`http://localhost:8080${url}`:null;}
-  openProfile():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,title:u.title??''});this.showProfileModal.set(true);}
+  openProfile():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,username:u.username,title:u.title??''});this.showProfileModal.set(true);}
   openStatus():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
-  saveProfile():void{if(this.profileForm.invalid)return;this.profileSaving.set(true);const v=this.profileForm.getRawValue();this.authService.updateProfile({displayName:v.displayName,title:v.title||null}).subscribe({next:()=>{this.profileSaving.set(false);this.showProfileModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save profile.');}});}
+  saveProfile():void{if(this.profileForm.invalid)return;this.profileSaving.set(true);const v=this.profileForm.getRawValue();this.authService.updateProfile({displayName:v.displayName,username:v.username,title:v.title||null}).subscribe({next:()=>{this.profileSaving.set(false);this.showProfileModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save profile.');}});}
   saveStatus():void{if(this.statusForm.invalid)return;this.profileSaving.set(true);const v=this.statusForm.getRawValue();this.authService.updateStatus({text:v.text||null,emoji:v.emoji||null,expiresAt:v.expiresAt?new Date(v.expiresAt).toISOString():null}).subscribe({next:()=>{this.profileSaving.set(false);this.showStatusModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save status.');}});}
   clearStatus():void{this.authService.clearStatus().subscribe(()=>this.showStatusModal.set(false));}
   changeAvatar(event:Event):void{const file=(event.target as HTMLInputElement).files?.[0];if(!file)return;this.profileSaving.set(true);this.authService.uploadAvatar(file).subscribe({next:()=>this.profileSaving.set(false),error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not upload avatar.');}});}
@@ -775,6 +802,14 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       : [...items, message].sort((a, b) => a.id - b.id));
     if (message.deletedAt && this.editingConversationMessageId() === message.id) this.editingConversationMessageId.set(null);
   }
+  private handleConversationMessageEvent(event:import('../../conversations/conversation.models').ConversationMessageEvent):void{
+    if(event.type==='THREAD_REPLY_CREATED'){
+      if(this.threadRootId()===event.threadRootMessageId)this.conversationThread.update(items=>items.some(x=>x.id===event.message.id)?items.map(x=>x.id===event.message.id?event.message:x):[...items,event.message]);
+      return;
+    }
+    this.upsertConversationMessage(event.message);
+    if(event.threadRootMessageId&&this.threadRootId()===event.threadRootMessageId)this.conversationThread.update(items=>items.map(x=>x.id===event.message.id?event.message:x));
+  }
   private upsertConversation(conversation: Conversation): void {
     this.conversations.update(items => [conversation, ...items.filter(item => item.id !== conversation.id)]
       .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)));
@@ -880,7 +915,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     const workspaceId = this.selectedWorkspaceId();
     const channel = this.selectedChannel();
 
-    if (workspaceId === null || channel === null) {
+    if (workspaceId === null || channel === null || channel.archivedAt !== null) {
       return;
     }
 
@@ -914,6 +949,9 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
           }
 
           this.upsertMessage(message);
+          const file=this.selectedFile();
+          if(file)this.messageService.upload(message.id,file).subscribe();
+          this.selectedFile.set(null);
           this.messageForm.reset({ content: '' });
           this.isSendingMessage.set(false);
         },
@@ -1175,18 +1213,18 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   private loadMessages(workspaceId: number, channelId: number): void {
+    this.clearAttachmentObjectUrls();
+    this.channelService.mentionableUsers(workspaceId,channelId).subscribe(users=>this.mentionCandidates.set(users));
     this.messageWebSocketService.subscribeToChannel(
       workspaceId,
       channelId,
-      (message) => {
+      (event) => {
         if (
           this.selectedWorkspaceId() === workspaceId &&
           this.selectedChannel()?.id === channelId &&
-          message.channelId === channelId
+          event.message.channelId === channelId
         ) {
-          const file=this.selectedFile();
-          if(file)this.messageService.upload(message.id,file).subscribe(a=>this.upsertMessage({...message,attachments:[...message.attachments,a]}));else this.upsertMessage(message);
-          this.selectedFile.set(null);
+          this.handleChannelMessageEvent(event);
         }
       },
       event => this.handleTyping(event),
@@ -1311,6 +1349,15 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       if (Date.parse(message.updatedAt) < Date.parse(current[index].updatedAt)) return current;
       return current.map(existing => existing.id === message.id ? message : existing);
     });
+  }
+  private handleChannelMessageEvent(event:ChannelMessageEvent):void{
+    if(event.type==='THREAD_REPLY_CREATED'){
+      if(this.threadRootId()===event.threadRootMessageId)this.channelThread.update(items=>items.some(x=>x.id===event.message.id)?items.map(x=>x.id===event.message.id?event.message:x):[...items,event.message]);
+      return;
+    }
+    this.upsertMessage(event.message);
+    if(event.threadRootMessageId&&this.threadRootId()===event.threadRootMessageId)this.channelThread.update(items=>items.map(x=>x.id===event.message.id?event.message:x));
+    if((event.type==='MESSAGE_PINNED'||event.type==='MESSAGE_UNPINNED')&&this.showPinnedMessages())this.openPinnedMessages();
   }
 
   startEditingMessage(message: Message): void {

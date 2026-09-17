@@ -2,6 +2,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   displayName: string;
+  username: string;
 }
 
 export interface LoginRequest {
@@ -13,6 +14,7 @@ export interface UserResponse {
   id: number;
   email: string;
   displayName: string;
+  username: string;
   createdAt: string;
   title?: string | null;
   avatarUrl?: string | null;

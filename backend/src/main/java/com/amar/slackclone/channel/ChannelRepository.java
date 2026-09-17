@@ -41,4 +41,13 @@ public interface ChannelRepository extends JpaRepository<Channel, Long> {
             @Param("workspaceId") Long workspaceId,
             @Param("userId") Long userId
     );
+
+    @Query("""
+        SELECT DISTINCT c FROM Channel c
+        LEFT JOIN ChannelMember cm ON cm.channel = c AND cm.user.id = :userId
+        WHERE c.workspace.id = :workspaceId AND c.archivedAt IS NOT NULL
+          AND (c.privateChannel = false OR cm.id IS NOT NULL)
+        ORDER BY c.archivedAt DESC
+        """)
+    List<Channel> findVisibleArchivedChannels(@Param("workspaceId") Long workspaceId,@Param("userId") Long userId);
 }

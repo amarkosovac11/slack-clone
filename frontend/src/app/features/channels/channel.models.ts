@@ -30,5 +30,7 @@ export interface ChannelMember {
   userId: number;
   displayName: string;
   email: string;
+  username: string;
+  avatarUrl: string | null;
   joinedAt: string;
 }

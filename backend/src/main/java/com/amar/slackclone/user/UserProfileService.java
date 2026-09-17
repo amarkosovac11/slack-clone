@@ -38,12 +38,15 @@ public class UserProfileService {
         User viewer=user(email);
         if(!viewer.getId().equals(userId)&&!members.shareWorkspace(viewer.getId(),userId)) throw new SecurityException("You cannot view this user profile");
         User target=users.findById(userId).orElseThrow(()->new IllegalArgumentException("User not found"));boolean active=activeStatus(target);
-        return new UserSummaryResponse(target.getId(),target.getDisplayName(),target.getTitle(),avatarUrl(target),active?target.getCustomStatusText():null,active?target.getCustomStatusEmoji():null,active?target.getCustomStatusExpiresAt():null,presence.status(target.getId()).name(),target.getLastSeenAt());
+        return new UserSummaryResponse(target.getId(),target.getDisplayName(),target.getUsername(),target.getTitle(),avatarUrl(target),active?target.getCustomStatusText():null,active?target.getCustomStatusEmoji():null,active?target.getCustomStatusExpiresAt():null,presence.status(target.getId()).name(),target.getLastSeenAt());
     }
 
     @Transactional
     public CurrentUserProfileResponse update(String email, UpdateProfileRequest request) {
-        User user=user(email); user.setDisplayName(request.displayName().trim()); user.setTitle(trimToNull(request.title()));
+        User user=user(email); String username=request.username().trim().toLowerCase(java.util.Locale.ROOT);
+        users.findByUsernameIgnoreCase(username).filter(existing->!existing.getId().equals(user.getId()))
+            .ifPresent(existing->{throw new IllegalArgumentException("Username is already in use");});
+        user.setDisplayName(request.displayName().trim()); user.setUsername(username); user.setTitle(trimToNull(request.title()));
         user.setUpdatedAt(Instant.now()); publish(user,"PROFILE_UPDATED"); return response(user,presence.status(user.getId()).name());
     }
 
@@ -80,6 +83,6 @@ public class UserProfileService {
     private String trimToNull(String value){if(value==null)return null;String v=value.trim();return v.isEmpty()?null:v;}
     private String avatarUrl(User u){return u.getAvatarKey()==null?null:"/api/users/avatars/"+u.getAvatarKey();}
     private boolean activeStatus(User u){return u.getCustomStatusExpiresAt()==null||u.getCustomStatusExpiresAt().isAfter(Instant.now());}
-    private CurrentUserProfileResponse response(User u,String presence){boolean active=activeStatus(u);return new CurrentUserProfileResponse(u.getId(),u.getEmail(),u.getDisplayName(),u.getTitle(),avatarUrl(u),active?u.getCustomStatusText():null,active?u.getCustomStatusEmoji():null,active?u.getCustomStatusExpiresAt():null,presence,u.getLastSeenAt(),u.getCreatedAt());}
-    private void publish(User u,String type){boolean active=activeStatus(u);var event=new UserProfileEvent(type,u.getId(),u.getDisplayName(),u.getTitle(),avatarUrl(u),active?u.getCustomStatusText():null,active?u.getCustomStatusEmoji():null,active?u.getCustomStatusExpiresAt():null,null,u.getLastSeenAt());messaging.convertAndSend("/topic/users/"+u.getId()+"/profile-events",event);members.findMessageableUsers(u.getId()).forEach(viewer->messaging.convertAndSend("/topic/users/"+viewer.getId()+"/profile-events",event));}
+    private CurrentUserProfileResponse response(User u,String presence){boolean active=activeStatus(u);return new CurrentUserProfileResponse(u.getId(),u.getEmail(),u.getDisplayName(),u.getUsername(),u.getTitle(),avatarUrl(u),active?u.getCustomStatusText():null,active?u.getCustomStatusEmoji():null,active?u.getCustomStatusExpiresAt():null,presence,u.getLastSeenAt(),u.getCreatedAt());}
+    private void publish(User u,String type){boolean active=activeStatus(u);var event=new UserProfileEvent(type,u.getId(),u.getDisplayName(),u.getUsername(),u.getTitle(),avatarUrl(u),active?u.getCustomStatusText():null,active?u.getCustomStatusEmoji():null,active?u.getCustomStatusExpiresAt():null,null,u.getLastSeenAt());messaging.convertAndSend("/topic/users/"+u.getId()+"/profile-events",event);members.findMessageableUsers(u.getId()).forEach(viewer->messaging.convertAndSend("/topic/users/"+viewer.getId()+"/profile-events",event));}
 }

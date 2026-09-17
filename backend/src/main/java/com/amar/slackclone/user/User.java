@@ -26,6 +26,9 @@ public class User {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
+    @Column(nullable = false, length = 32)
+    private String username;
+
     @Column(length = 120)
     private String title;
 
@@ -63,6 +66,7 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
+        this.username = "user_" + Integer.toUnsignedString(email.toLowerCase().hashCode(), 36);
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -94,6 +98,9 @@ public class User {
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
     }
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
