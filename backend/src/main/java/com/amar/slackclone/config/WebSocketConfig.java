@@ -1,6 +1,7 @@
 package com.amar.slackclone.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -12,9 +13,11 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketSecurityInterceptor webSocketSecurityInterceptor;
+    private final String[] allowedOrigins;
 
-    public WebSocketConfig(WebSocketSecurityInterceptor webSocketSecurityInterceptor) {
+    public WebSocketConfig(WebSocketSecurityInterceptor webSocketSecurityInterceptor,@Value("${app.cors.allowed-origins:http://localhost:4200}") String[] allowedOrigins) {
         this.webSocketSecurityInterceptor = webSocketSecurityInterceptor;
+        this.allowedOrigins=allowedOrigins;
     }
 
     @Override
@@ -26,7 +29,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-            .setAllowedOrigins("http://localhost:4200");
+            .setAllowedOrigins(allowedOrigins);
     }
 
     @Override
