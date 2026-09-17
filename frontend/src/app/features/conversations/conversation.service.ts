@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Conversation, ConversationMessage, ConversationMessagePage, ConversationParticipant, ConversationReadReceipt, ConversationUser } from './conversation.models';
+import { Conversation, ConversationMessage, ConversationMessagePage, ConversationMessageReceipt, ConversationParticipant, ConversationReadReceipt, ConversationUser } from './conversation.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConversationService {
@@ -19,6 +19,7 @@ export class ConversationService {
   leave(id: number): Observable<void> { return this.http.post<void>(`${this.url}/${id}/leave`, {}); }
   transferCreator(id:number,newCreatorUserId:number):Observable<Conversation>{return this.http.post<Conversation>(`${this.url}/${id}/transfer-creator`,{newCreatorUserId});}
   receipt(id:number,messageId:number):Observable<ConversationReadReceipt>{return this.http.get<ConversationReadReceipt>(`${this.url}/${id}/messages/${messageId}/receipt`);}
+  receipts(id:number):Observable<ConversationMessageReceipt[]>{return this.http.get<ConversationMessageReceipt[]>(`${this.url}/${id}/receipts`);}
   react(id:number,messageId:number,emoji:string):Observable<ConversationMessage>{return this.http.post<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/reactions`,{emoji});}
   unreact(id:number,messageId:number,emoji:string):Observable<ConversationMessage>{return this.http.delete<ConversationMessage>(`${this.url}/${id}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`);}
   thread(id:number,messageId:number):Observable<ConversationMessage[]>{return this.http.get<ConversationMessage[]>(`${this.url}/${id}/messages/${messageId}/thread`);}

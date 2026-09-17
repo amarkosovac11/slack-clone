@@ -24,14 +24,16 @@ public class ConversationService {
     private final ConversationMessageMentionRepository mentionRepository;
     private final ConversationMessageReactionRepository reactionRepository; private final ConversationMessageAttachmentRepository attachmentRepository;
     private final NotificationService notificationService;
+    private final ConversationReceiptService receiptService;
 
     public ConversationService(ConversationRepository conversations, ConversationParticipantRepository participants,
             ConversationMessageRepository messages, UserRepository users, WorkspaceMemberRepository workspaceMembers,
             ConversationAccessService access, SimpMessagingTemplate broker, ConversationMessageMentionRepository mentionRepository,ConversationMessageReactionRepository reactionRepository,ConversationMessageAttachmentRepository attachmentRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,ConversationReceiptService receiptService) {
         this.conversations = conversations; this.participants = participants; this.messages = messages;
         this.users = users; this.workspaceMembers = workspaceMembers; this.access = access; this.broker = broker; this.mentionRepository=mentionRepository;this.reactionRepository=reactionRepository;this.attachmentRepository=attachmentRepository;
         this.notificationService=notificationService;
+        this.receiptService=receiptService;
     }
 
     @Transactional
@@ -186,6 +188,7 @@ public class ConversationService {
     public ConversationResponse markRead(Long id, String email) {
         ConversationParticipant participant = access.requireParticipant(id, email);
         messages.findTopByConversationIdAndCreatedAtGreaterThanEqualOrderByIdDesc(id, participant.getJoinedAt()).ifPresent(participant::setLastReadMessage);
+        Long readThrough=participant.getLastReadMessage()==null?null:participant.getLastReadMessage().getId();
         ConversationResponse result = response(participant.getConversation(), participant.getUser());
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() { broker.convertAndSend(
@@ -193,6 +196,7 @@ public class ConversationService {
                 participants.findAllByConversationIdAndLeftAtIsNullOrderByJoinedAt(id).forEach(member -> broker.convertAndSend(
                     "/topic/users/"+member.getUser().getId()+"/conversations/"+id+"/metadata",new ConversationMetadataEvent("READ_UPDATED",id,participant.getUser().getId()))); }
         });
+        receiptService.publishReadUpdates(participant,readThrough);
         return result;
     }
     @Transactional(readOnly=true)
