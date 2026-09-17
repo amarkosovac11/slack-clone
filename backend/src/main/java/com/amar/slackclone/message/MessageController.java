@@ -56,6 +56,7 @@ public class MessageController {
             .status(HttpStatus.CREATED)
             .body(message);
     }
+    @GetMapping("/{messageId}/context") public com.amar.slackclone.message.dto.MessageContextResponse context(@PathVariable Long workspaceId,@PathVariable Long channelId,@PathVariable Long messageId,Authentication authentication){return messageService.messageContext(workspaceId,channelId,messageId,authentication.getName());}
 
     @PatchMapping("/{messageId}")
     public MessageResponse updateMessage(@PathVariable Long workspaceId, @PathVariable Long channelId,

@@ -19,6 +19,8 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
     Optional<ConversationMessage> findTopByConversationIdAndCreatedAtGreaterThanEqualOrderByIdDesc(Long conversationId, java.time.OffsetDateTime joinedAt);
     Optional<ConversationMessage> findByIdAndConversationId(Long id, Long conversationId);
     List<ConversationMessage> findAllByThreadRootMessageIdAndCreatedAtGreaterThanEqualOrderByCreatedAt(Long rootId,java.time.OffsetDateTime joinedAt);
+    List<ConversationMessage> findByConversationIdAndIdLessThanEqualAndCreatedAtGreaterThanEqualOrderByIdDesc(Long conversationId,Long targetId,java.time.OffsetDateTime joinedAt,Pageable page);
+    List<ConversationMessage> findByConversationIdAndIdGreaterThanAndCreatedAtGreaterThanEqualOrderById(Long conversationId,Long targetId,java.time.OffsetDateTime joinedAt,Pageable page);
     long countByThreadRootMessageId(Long rootId);
     @Query("select m from ConversationMessage m join ConversationParticipant cp on cp.conversation=m.conversation where cp.user.id=:userId and cp.leftAt is null and cp.hiddenAt is null and m.createdAt>=cp.joinedAt and m.deletedAt is null and lower(m.content) like lower(concat('%',:q,'%')) order by m.createdAt desc")List<ConversationMessage> searchAccessible(@Param("userId")Long userId,@Param("q")String q,Pageable p);
 

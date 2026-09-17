@@ -110,6 +110,13 @@ public class ConversationService {
         Collections.reverse(descending);
         return new ConversationMessagePageResponse(descending.stream().map(this::messageResponse).toList(), next);
     }
+    @Transactional(readOnly=true) public ConversationMessageContextResponse messageContext(Long id,Long messageId,String email){
+        ConversationParticipant membership=access.requireParticipant(id,email);ConversationMessage target=requireMessage(id,messageId);
+        if(target.getCreatedAt().isBefore(membership.getJoinedAt()))throw new ConversationAccessDeniedException("Message predates your membership");
+        var before=messages.findByConversationIdAndIdLessThanEqualAndCreatedAtGreaterThanEqualOrderByIdDesc(id,messageId,membership.getJoinedAt(),PageRequest.of(0,25));
+        Collections.reverse(before);var context=new ArrayList<>(before);context.addAll(messages.findByConversationIdAndIdGreaterThanAndCreatedAtGreaterThanEqualOrderById(id,messageId,membership.getJoinedAt(),PageRequest.of(0,25)));
+        return new ConversationMessageContextResponse(messageId,target.getThreadRootMessage()==null?null:target.getThreadRootMessage().getId(),context.stream().map(this::messageResponse).toList());
+    }
 
     @Transactional
     public ConversationMessageResponse send(Long id, CreateConversationMessageRequest request, String email) {

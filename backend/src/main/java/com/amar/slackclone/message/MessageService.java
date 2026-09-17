@@ -68,6 +68,11 @@ public class MessageService {
             .map(message -> toMessageResponse(message, getAuthenticatedUser(authenticatedEmail).getId()))
             .toList();
     }
+    @Transactional(readOnly=true) public com.amar.slackclone.message.dto.MessageContextResponse messageContext(Long workspaceId,Long channelId,Long messageId,String email){
+        channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message target=requireMessage(channelId,messageId);Long viewerId=getAuthenticatedUser(email).getId();
+        List<MessageResponse> context=messageRepository.findAllByChannelIdOrderByCreatedAtAsc(channelId).stream().map(message->toMessageResponse(message,viewerId)).toList();
+        return new com.amar.slackclone.message.dto.MessageContextResponse(messageId,target.getThreadRootMessage()==null?null:target.getThreadRootMessage().getId(),context);
+    }
 
     @Transactional
     public MessageResponse createMessage(

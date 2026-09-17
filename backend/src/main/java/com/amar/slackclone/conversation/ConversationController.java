@@ -47,6 +47,7 @@ public class ConversationController {
             @RequestParam(defaultValue = "50") @Min(1) @Max(100) int limit, Authentication auth) {
         return service.history(id, before, limit, auth.getName());
     }
+    @GetMapping("/{id}/messages/{messageId}/context") public ConversationMessageContextResponse messageContext(@PathVariable Long id,@PathVariable Long messageId,Authentication auth){return service.messageContext(id,messageId,auth.getName());}
     @PostMapping("/{id}/messages") @ResponseStatus(HttpStatus.CREATED)
     public ConversationMessageResponse send(@PathVariable Long id, @Valid @RequestBody CreateConversationMessageRequest request, Authentication auth) {
         return service.send(id, request, auth.getName());
