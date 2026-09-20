@@ -28,7 +28,7 @@
 
 .composer-hint {
     margin-left: 6px;
-    color: #9ca3af;
+    color: var(--text-muted);
     font-size: 11px;
 }
 

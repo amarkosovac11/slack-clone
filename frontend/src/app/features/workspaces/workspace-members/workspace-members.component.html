@@ -6,7 +6,7 @@
 @if (isOpen()) {
   <div class="members-backdrop" role="presentation" (click)="close()">
     <section
-      class="members-modal"
+      appDialogFocus class="members-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="workspace-members-title"
@@ -88,7 +88,7 @@
       @if (memberPendingRemoval(); as member) {
         <div class="confirmation-backdrop" role="presentation" (click)="cancelRemoval()">
           <section
-            class="confirmation-dialog"
+            appDialogFocus class="confirmation-dialog"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="remove-member-title"

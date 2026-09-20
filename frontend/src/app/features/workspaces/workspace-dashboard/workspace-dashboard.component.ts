@@ -1,3 +1,4 @@
+import { DialogFocusDirective } from '../../../shared/ui/dialog-focus.directive';
 import { IconComponent } from '../../../shared/ui/icon.component';
 import { UserProfileComponent } from '../../../shared/ui/user-profile.component';
 import { CommonModule } from '@angular/common';
@@ -37,6 +38,7 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
   selector: 'app-workspace-dashboard',
   standalone: true,
   imports: [
+    DialogFocusDirective,
     CommonModule,
     IconComponent,
     UserProfileComponent,
@@ -61,7 +63,6 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly errorMessage = signal('');
   readonly showCreateWorkspaceModal = signal(false);
   readonly workspaceCreateError = signal<string | null>(null);
-  readonly showProfilePlaceholder = signal(false);
   readonly showProfileModal = signal(false);
   readonly showStatusModal = signal(false);
   readonly showNotifications=signal(false);
@@ -502,14 +503,6 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  toggleProfilePlaceholder(): void {
-    this.showProfilePlaceholder.update((visible) => !visible);
-  }
-
-  closeProfilePlaceholder(): void {
-    this.showProfilePlaceholder.set(false);
-  }
-
   openChannelSettingsFromSidebar(event: Event, channel: Channel): void {
     event.stopPropagation();
     const workspaceId = this.selectedWorkspaceId();
@@ -697,8 +690,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
   }
   avatarSrc(url:string|null|undefined):string|null{return url?`${environment.apiBaseUrl}${url}`:null;}
-  openProfile():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,username:u.username,title:u.title??''});this.showProfileModal.set(true);}
-  openStatus():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
+  openProfile():void{const u=this.currentUser();if(!u)return;this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,username:u.username,title:u.title??''});this.showProfileModal.set(true);}
+  openStatus():void{const u=this.currentUser();if(!u)return;this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
   saveProfile():void{if(this.profileForm.invalid)return;this.profileSaving.set(true);const v=this.profileForm.getRawValue();this.authService.updateProfile({displayName:v.displayName,username:v.username,title:v.title||null}).subscribe({next:()=>{this.profileSaving.set(false);this.showProfileModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save profile.');}});}
   saveStatus():void{if(this.statusForm.invalid)return;this.profileSaving.set(true);const v=this.statusForm.getRawValue();this.authService.updateStatus({text:v.text||null,emoji:v.emoji||null,expiresAt:v.expiresAt?new Date(v.expiresAt).toISOString():null}).subscribe({next:()=>{this.profileSaving.set(false);this.showStatusModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save status.');}});}
   clearStatus():void{this.authService.clearStatus().subscribe(()=>this.showStatusModal.set(false));}

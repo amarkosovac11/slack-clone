@@ -153,7 +153,7 @@ input:focus {
 
 .optional-label {
     margin-left: 4px;
-    color: #9ca3af;
+    color: var(--text-muted);
     font-size: 12px;
     font-weight: 500;
 }
@@ -477,3 +477,10 @@ input:focus {
 }
 
 .create-channel-modal, .channel-members-modal { color: var(--text); }
+
+.list-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.message-delete-dialog { max-height: calc(100dvh - 48px); overflow: auto; }
+.message-delete-dialog h2 { font-size: 18px; font-weight: 650; }
+.message-delete-dialog .member-row { gap: 12px; padding-block: 12px; overflow-wrap: anywhere; }
+.message-delete-dialog .member-row > div { min-width: 0; }
+.message-delete-dialog .member-row > button, .message-delete-dialog .member-row > span > button { padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-control); color: var(--accent); font-size: 12px; }

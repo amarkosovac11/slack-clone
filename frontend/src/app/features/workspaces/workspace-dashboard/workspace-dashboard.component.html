@@ -9,7 +9,7 @@
     (click)="closeCreateWorkspaceModal()"
   >
     <section
-      class="create-channel-modal"
+      appDialogFocus class="create-channel-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-workspace-title"
@@ -113,11 +113,11 @@
     <div class="sidebar-utilities">
       <app-search-panel [workspaceId]="selectedWorkspaceId()" (selected)="openSearchHit($event)"></app-search-panel>
       <div class="notifications-control" (keydown.escape)="showNotifications.set(false)">
-        <button type="button" class="notification-bell sidebar-icon-button" title="Notifications" aria-label="Notifications"
+        <button type="button" #notificationTrigger class="notification-bell sidebar-icon-button" title="Notifications" aria-label="Notifications"
           [attr.aria-expanded]="showNotifications()" aria-controls="notifications-popup" (click)="showNotifications.set(!showNotifications())">
           <app-icon name="bell" />@if(notificationService.unreadCount()>0){<span>{{notificationService.unreadCount()}}</span>}
         </button>
-        @if(showNotifications()){<app-notification-panel id="notifications-popup" (selected)="openNotification($event)"></app-notification-panel>}
+        @if(showNotifications()){<app-notification-panel id="notifications-popup" (closed)="showNotifications.set(false); notificationTrigger.focus()" (selected)="openNotification($event)"></app-notification-panel>}
       </div>
     </div>
     <div class="sidebar-scroll">
@@ -469,16 +469,16 @@
 }
 
 @if(showProfileModal()){
-<div class="modal-backdrop" (click)="showProfileModal.set(false)"><section class="create-channel-modal profile-settings-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
-<header class="modal-header"><div><h2>Profile & settings</h2><p>Manage how people see you.</p></div><button type="button" class="modal-close-button" (click)="showProfileModal.set(false)">&times;</button></header>
-<form class="create-channel-form" [formGroup]="profileForm" (ngSubmit)="saveProfile()"><div class="profile-avatar-editor">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="Current avatar" />}@else{<span>{{userInitial()}}</span>}<label class="secondary-button">Change avatar<input type="file" accept="image/jpeg,image/png,image/webp" (change)="changeAvatar($event)" hidden></label></div>
+<div class="modal-backdrop" (click)="showProfileModal.set(false)"><section appDialogFocus class="create-channel-modal profile-settings-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+<header class="modal-header"><div><h2>Profile & settings</h2><p>Manage how people see you.</p></div><button type="button" class="modal-close-button" aria-label="Close profile settings" (click)="showProfileModal.set(false)">&times;</button></header>
+<form class="create-channel-form" [formGroup]="profileForm" (ngSubmit)="saveProfile()"><div class="profile-avatar-editor">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="Current avatar" />}@else{<span>{{userInitial()}}</span>}<label class="secondary-button file-picker">Change avatar<input type="file" aria-label="Change avatar" accept="image/jpeg,image/png,image/webp" (change)="changeAvatar($event)"></label></div>
 <div class="form-field"><label for="profile-name">Display name</label><input id="profile-name" formControlName="displayName"></div><div class="form-field"><label for="profile-username">Username</label><input id="profile-username" formControlName="username" autocomplete="username"></div><div class="form-field"><label for="profile-title">Title</label><input id="profile-title" formControlName="title" placeholder="Backend Developer"></div>
 @if(profileError()){<div class="modal-error">{{profileError()}}</div>}<div class="modal-actions"><button type="button" class="secondary-button" (click)="showProfileModal.set(false)">Cancel</button><button type="submit" class="primary-button" [disabled]="profileSaving()||profileForm.invalid">Save</button></div></form>
-<form class="create-channel-form account-section" [formGroup]="passwordForm" (ngSubmit)="changePassword()"><h3>Change password</h3><div class="form-field"><label>Current password</label><input type="password" formControlName="currentPassword"></div><div class="form-field"><label>New password</label><input type="password" formControlName="newPassword"></div><button type="submit" class="secondary-button" [disabled]="profileSaving()||passwordForm.invalid">Change password</button></form>
+<form class="create-channel-form account-section" [formGroup]="passwordForm" (ngSubmit)="changePassword()"><h3>Change password</h3><div class="form-field"><label for="current-password">Current password</label><input id="current-password" type="password" autocomplete="current-password" formControlName="currentPassword"></div><div class="form-field"><label for="new-password">New password</label><input id="new-password" type="password" autocomplete="new-password" formControlName="newPassword"></div><button type="submit" class="secondary-button" [disabled]="profileSaving()||passwordForm.invalid">Change password</button></form>
 </section></div>}
 
 @if(showStatusModal()){
-<div class="modal-backdrop" (click)="showStatusModal.set(false)"><section class="create-channel-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()"><header class="modal-header"><div><h2>Set a status</h2><p>Presence and custom status are separate.</p></div><button type="button" class="modal-close-button" (click)="showStatusModal.set(false)">&times;</button></header><form class="create-channel-form" [formGroup]="statusForm" (ngSubmit)="saveStatus()"><div class="status-fields"><div class="form-field"><label>Emoji</label><input formControlName="emoji" placeholder="☕"></div><div class="form-field"><label>Status</label><input formControlName="text" placeholder="Coffee break"></div></div><div class="form-field"><label>Clear at (optional)</label><input type="datetime-local" formControlName="expiresAt"></div>@if(profileError()){<div class="modal-error">{{profileError()}}</div>}<div class="modal-actions"><button type="button" class="secondary-button" (click)="clearStatus()">Clear status</button><button type="submit" class="primary-button" [disabled]="profileSaving()||statusForm.invalid">Save</button></div></form></section></div>}
+<div class="modal-backdrop" (click)="showStatusModal.set(false)"><section appDialogFocus class="create-channel-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()"><header class="modal-header"><div><h2>Set a status</h2><p>Let your teammates know what you're up to.</p></div><button type="button" class="modal-close-button" aria-label="Close status settings" (click)="showStatusModal.set(false)">&times;</button></header><form class="create-channel-form" [formGroup]="statusForm" (ngSubmit)="saveStatus()"><div class="status-fields"><div class="form-field"><label for="status-emoji">Emoji</label><input id="status-emoji" formControlName="emoji" placeholder="☕"></div><div class="form-field"><label for="status-text">Status</label><input id="status-text" formControlName="text" placeholder="Coffee break"></div></div><div class="form-field"><label for="status-expires">Clear at (optional)</label><input id="status-expires" type="datetime-local" formControlName="expiresAt"></div>@if(profileError()){<div class="modal-error">{{profileError()}}</div>}<div class="modal-actions"><button type="button" class="secondary-button" (click)="clearStatus()">Clear status</button><button type="submit" class="primary-button" [disabled]="profileSaving()||statusForm.invalid">Save</button></div></form></section></div>}
 
 @if (showChannelMembersModal()) {
 
@@ -487,7 +487,7 @@
   (click)="closeChannelMembersModal()"
 >
   <div
-    class="channel-members-modal"
+    appDialogFocus class="channel-members-modal"
     (click)="$event.stopPropagation()"
   >
     <div class="modal-header">
@@ -613,7 +613,7 @@
   (click)="closeCreateChannelModal()"
 >
   <div
-    class="create-channel-modal"
+    appDialogFocus class="create-channel-modal"
     (click)="$event.stopPropagation()"
   >
 
@@ -737,7 +737,7 @@
 }
 @if (showChannelSettingsModal() && selectedChannel(); as channel) {
   <div class="modal-backdrop" role="presentation" (click)="closeChannelSettings()">
-    <section class="create-channel-modal channel-settings-modal" role="dialog" aria-modal="true"
+    <section appDialogFocus class="create-channel-modal channel-settings-modal" role="dialog" aria-modal="true"
       aria-labelledby="channel-settings-title" (click)="$event.stopPropagation()">
       <header class="modal-header">
         <div><h2 id="channel-settings-title">Channel settings</h2><p>#{{ channel.name }}</p></div>
@@ -801,7 +801,7 @@
 }
 @if (messagePendingDelete(); as message) {
   <div class="modal-backdrop" role="presentation" (click)="cancelMessageDelete()">
-    <section class="message-delete-dialog" role="alertdialog" aria-modal="true"
+    <section appDialogFocus class="message-delete-dialog" role="alertdialog" aria-modal="true"
       aria-labelledby="delete-message-title" (click)="$event.stopPropagation()">
       <h2 id="delete-message-title">Delete this message?</h2>
       <p>This message will be replaced with “This message was deleted”.</p>
@@ -818,9 +818,9 @@
 
 @if (showStartConversationModal()) {
   <div class="modal-backdrop" role="presentation" (click)="closeStartConversationModal()">
-    <section class="create-channel-modal dm-modal" role="dialog" aria-modal="true" aria-labelledby="start-dm-title" (click)="$event.stopPropagation()">
+    <section appDialogFocus class="create-channel-modal dm-modal" role="dialog" aria-modal="true" aria-labelledby="start-dm-title" (click)="$event.stopPropagation()">
       <header class="modal-header"><div><h2 id="start-dm-title">New message</h2><p>Choose one person for a direct message, or select several people to start a group.</p></div>
-        <button type="button" class="modal-close-button" [disabled]="conversationModalLoading()" (click)="closeStartConversationModal()">&times;</button></header>
+        <button type="button" class="modal-close-button" aria-label="Close new message" [disabled]="conversationModalLoading()" (click)="closeStartConversationModal()">&times;</button></header>
       <div class="dm-user-list">
         @if (conversationModalLoading() && eligibleUsers().length === 0) { <div class="members-state">Loading people...</div> }
         @else if (!conversationModalLoading() && eligibleUsers().length === 0) { <div class="members-state">No workspace members are available to message.</div> }
@@ -843,10 +843,10 @@
 
 @if (showRenameConversationModal() && selectedConversation(); as conversation) {
   <div class="modal-backdrop" role="presentation" (click)="showRenameConversationModal.set(false)">
-    <section class="message-delete-dialog conversation-action-dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <section appDialogFocus class="message-delete-dialog conversation-action-dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
       <h2>Rename group</h2><p>Leave the name empty to use participant names automatically.</p>
       <form [formGroup]="renameConversationForm" (ngSubmit)="saveConversationName()">
-        <input formControlName="name" maxlength="100" placeholder="Group name" />
+        <input aria-label="Group name" formControlName="name" maxlength="100" placeholder="Group name" />
         <div class="modal-actions"><button type="button" class="secondary-button" [disabled]="conversationActionLoading()" (click)="showRenameConversationModal.set(false)">Cancel</button><button type="submit" class="primary-button" [disabled]="conversationActionLoading()">Save name</button></div>
       </form>
     </section>
@@ -855,9 +855,9 @@
 
 @if (showGroupMembersModal() && selectedConversation(); as conversation) {
   <div class="modal-backdrop" role="presentation" (click)="closeGroupMembers()">
-    <section class="create-channel-modal group-members-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <section appDialogFocus class="create-channel-modal group-members-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
       <header class="modal-header"><div><h2>{{ conversation.displayName }}</h2><p>{{ groupMembers().length }} {{ groupMembers().length === 1 ? 'member' : 'members' }}</p></div>
-        <button type="button" class="modal-close-button" (click)="closeGroupMembers()">&times;</button></header>
+        <button type="button" class="modal-close-button" aria-label="Close group members" (click)="closeGroupMembers()">&times;</button></header>
       <div class="channel-members-content">
         @if (groupMembersLoading()) { <div class="members-state">Loading members...</div> }
         @else {
@@ -881,22 +881,22 @@
     </section>
   </div>
 }
-@if(creatorTransferTarget();as member){<div class="modal-backdrop nested-modal"><section class="message-delete-dialog"><h2>Make {{member.displayName}} creator?</h2><p>You will become a regular participant and can then leave the group.</p><div class="modal-actions"><button type="button" (click)="creatorTransferTarget.set(null)">Cancel</button><button type="button" class="primary-button" (click)="transferGroupCreator()">Transfer creator</button></div></section></div>}
-@if(showHiddenConversations()){<div class="modal-backdrop" (click)="showHiddenConversations.set(false)"><section class="message-delete-dialog" (click)="$event.stopPropagation()"><h2>Hidden conversations</h2>@if(hiddenConversations().length===0){<p>No hidden conversations.</p>}@for(c of hiddenConversations();track c.id){<div class="member-row"><strong>{{c.displayName}}</strong><button type="button" (click)="restoreConversation(c)">Restore</button></div>}</section></div>}
-@if(showArchivedChannels()){<div class="modal-backdrop" (click)="showArchivedChannels.set(false)"><section class="message-delete-dialog" (click)="$event.stopPropagation()"><h2>Archived channels</h2>@if(archivedChannels().length===0){<p>No archived channels.</p>}@for(c of archivedChannels();track c.id){<div class="member-row"><strong>#{{c.name}}</strong><span><button type="button" (click)="openArchivedChannel(c)">View history</button>@if(canManageSelectedChannel()){<button type="button" (click)="unarchiveChannel(c)">Unarchive</button>}</span></div>}</section></div>}
-@if(showPinnedMessages()){<div class="modal-backdrop" (click)="showPinnedMessages.set(false)"><section class="message-delete-dialog" (click)="$event.stopPropagation()"><h2>Pinned messages</h2>@if(pinnedMessages().length===0){<p>No pinned messages.</p>}@for(pin of pinnedMessages();track pin.message.id){<div class="member-row"><div><strong>{{pin.message.senderDisplayName}}</strong><p>{{pin.message.content}}</p><small>Pinned by {{pin.pinnedByDisplayName}} · {{pin.pinnedAt|date:'short'}}</small></div><button type="button" (click)="togglePin(pin.message)">Unpin</button></div>}</section></div>}
+@if(creatorTransferTarget();as member){<div class="modal-backdrop nested-modal"><section appDialogFocus class="message-delete-dialog"><h2>Make {{member.displayName}} creator?</h2><p>You will become a regular participant and can then leave the group.</p><div class="modal-actions"><button type="button" (click)="creatorTransferTarget.set(null)">Cancel</button><button type="button" class="primary-button" (click)="transferGroupCreator()">Transfer creator</button></div></section></div>}
+@if(showHiddenConversations()){<div class="modal-backdrop" (click)="showHiddenConversations.set(false)"><section appDialogFocus class="message-delete-dialog" (click)="$event.stopPropagation()"><div class="list-dialog-header"><h2>Hidden conversations</h2><button type="button" class="modal-close-button" aria-label="Close hidden conversations" (click)="showHiddenConversations.set(false)"><app-icon name="close" /></button></div>@if(hiddenConversations().length===0){<p>No hidden conversations.</p>}@for(c of hiddenConversations();track c.id){<div class="member-row"><strong>{{c.displayName}}</strong><button type="button" (click)="restoreConversation(c)">Restore</button></div>}</section></div>}
+@if(showArchivedChannels()){<div class="modal-backdrop" (click)="showArchivedChannels.set(false)"><section appDialogFocus class="message-delete-dialog" (click)="$event.stopPropagation()"><div class="list-dialog-header"><h2>Archived channels</h2><button type="button" class="modal-close-button" aria-label="Close archived channels" (click)="showArchivedChannels.set(false)"><app-icon name="close" /></button></div>@if(archivedChannels().length===0){<p>No archived channels.</p>}@for(c of archivedChannels();track c.id){<div class="member-row"><strong>#{{c.name}}</strong><span><button type="button" (click)="openArchivedChannel(c)">View history</button>@if(canManageSelectedChannel()){<button type="button" (click)="unarchiveChannel(c)">Unarchive</button>}</span></div>}</section></div>}
+@if(showPinnedMessages()){<div class="modal-backdrop" (click)="showPinnedMessages.set(false)"><section appDialogFocus class="message-delete-dialog" (click)="$event.stopPropagation()"><div class="list-dialog-header"><h2>Pinned messages</h2><button type="button" class="modal-close-button" aria-label="Close pinned messages" (click)="showPinnedMessages.set(false)"><app-icon name="close" /></button></div>@if(pinnedMessages().length===0){<p>No pinned messages.</p>}@for(pin of pinnedMessages();track pin.message.id){<div class="member-row"><div><strong>{{pin.message.senderDisplayName}}</strong><p>{{pin.message.content}}</p><small>Pinned by {{pin.pinnedByDisplayName}} · {{pin.pinnedAt|date:'short'}}</small></div><button type="button" (click)="togglePin(pin.message)">Unpin</button></div>}</section></div>}
 
 @if (groupMemberPendingRemove(); as member) {
-  <div class="modal-backdrop nested-modal" role="presentation" (click)="groupMemberPendingRemove.set(null)"><section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()"><h2>Remove {{ member.displayName }}?</h2><p>They will lose access and will no longer receive new messages.</p><div class="modal-actions"><button type="button" class="secondary-button" (click)="groupMemberPendingRemove.set(null)">Cancel</button><button type="button" class="delete-channel-button" (click)="confirmRemoveGroupMember()">Remove</button></div></section></div>
+  <div class="modal-backdrop nested-modal" role="presentation" (click)="groupMemberPendingRemove.set(null)"><section appDialogFocus class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()"><h2>Remove {{ member.displayName }}?</h2><p>They will lose access and will no longer receive new messages.</p><div class="modal-actions"><button type="button" class="secondary-button" (click)="groupMemberPendingRemove.set(null)">Cancel</button><button type="button" class="delete-channel-button" (click)="confirmRemoveGroupMember()">Remove</button></div></section></div>
 }
 
 @if (confirmingGroupLeave() && selectedConversation(); as conversation) {
-  <div class="modal-backdrop nested-modal" role="presentation" (click)="confirmingGroupLeave.set(false)"><section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()"><h2>Leave {{ conversation.displayName }}?</h2><p>You will lose access to future messages. If re-added, you will only see messages from your new join time.</p><div class="modal-actions"><button type="button" class="secondary-button" (click)="confirmingGroupLeave.set(false)">Cancel</button><button type="button" class="delete-channel-button" (click)="confirmLeaveGroup()">Leave group</button></div></section></div>
+  <div class="modal-backdrop nested-modal" role="presentation" (click)="confirmingGroupLeave.set(false)"><section appDialogFocus class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()"><h2>Leave {{ conversation.displayName }}?</h2><p>You will lose access to future messages. If re-added, you will only see messages from your new join time.</p><div class="modal-actions"><button type="button" class="secondary-button" (click)="confirmingGroupLeave.set(false)">Cancel</button><button type="button" class="delete-channel-button" (click)="confirmLeaveGroup()">Leave group</button></div></section></div>
 }
 
 @if (confirmingConversationHide() && selectedConversation(); as conversation) {
   <div class="modal-backdrop" role="presentation" (click)="confirmingConversationHide.set(false)">
-    <section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <section appDialogFocus class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
       <h2>Remove this conversation?</h2><p>History is not deleted for anyone. Starting or receiving a new message will make it appear again.</p>
       <div class="modal-actions"><button type="button" class="secondary-button" [disabled]="conversationActionLoading()" (click)="confirmingConversationHide.set(false)">Cancel</button><button type="button" class="delete-channel-button" [disabled]="conversationActionLoading()" (click)="confirmHideConversation()">Remove</button></div>
     </section>
@@ -905,7 +905,7 @@
 
 @if (conversationMessagePendingDelete(); as message) {
   <div class="modal-backdrop" role="presentation" (click)="conversationMessagePendingDelete.set(null)">
-    <section class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <section appDialogFocus class="message-delete-dialog" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
       <h2>Delete this message?</h2><p>Other participants will see “Message deleted”.</p>
       <div class="modal-actions"><button type="button" class="secondary-button" [disabled]="conversationActionLoading()" (click)="conversationMessagePendingDelete.set(null)">Cancel</button><button type="button" class="delete-channel-button" [disabled]="conversationActionLoading()" (click)="confirmConversationMessageDelete()">Delete message</button></div>
     </section>

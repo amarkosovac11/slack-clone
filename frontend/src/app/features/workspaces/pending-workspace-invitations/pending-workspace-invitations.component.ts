@@ -1,3 +1,4 @@
+import { DialogFocusDirective } from '../../../shared/ui/dialog-focus.directive';
 import { IconComponent } from '../../../shared/ui/icon.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -10,7 +11,7 @@ import { WorkspaceInvitationService } from '../workspace-invitation.service';
 @Component({
   selector: 'app-pending-workspace-invitations',
   standalone: true,
-  imports: [IconComponent, CommonModule],
+  imports: [DialogFocusDirective, IconComponent, CommonModule],
   templateUrl: './pending-workspace-invitations.component.html',
   styleUrl: './pending-workspace-invitations.component.css',
 })
