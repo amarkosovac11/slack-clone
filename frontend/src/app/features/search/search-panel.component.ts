@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/ui/icon.component';
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnDestroy, Output, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
@@ -5,10 +6,10 @@ import { EMPTY, Subject, Subscription, catchError, debounceTime, distinctUntilCh
 import { SearchFilter, SearchHit, SearchService } from './search.service';
 
 @Component({
-  selector: 'app-search-panel', standalone: true, imports: [CommonModule, ReactiveFormsModule],
+  selector: 'app-search-panel', standalone: true, imports: [CommonModule, ReactiveFormsModule, IconComponent],
   styleUrl: './search-panel.component.css',
   template: `<div class="global-search" [formGroup]="form">
-    <input type="search" formControlName="query" placeholder="Search messages and people" aria-label="Search" (input)="search()">
+    <app-icon class="search-icon" name="search" /><input type="search" formControlName="query" placeholder="Search workspace" aria-label="Search" (input)="search()">
     @if(open()){<div class="search-results">
       <div class="search-filters">@for(filter of filters;track filter){<button type="button" [class.active]="selectedFilter()===filter" (click)="setFilter(filter)">{{filter==='ALL'?'All':filter==='PEOPLE'?'People':filter.charAt(0)+filter.slice(1).toLowerCase()}}</button>}</div>
       @if(loading()){<p>Searching...</p>}
