@@ -7,12 +7,8 @@
 
 .notification-bell { position: relative; flex: 0 0 auto; }
 .notification-bell span { position: absolute; top: -7px; right: -7px; min-width: 18px; border-radius: 999px; background: #d92d20; color: white; font-size: 11px; padding: 2px 5px; }
-.notification-panel { position: absolute; z-index: 40; top: calc(100% + 8px); left: 0; right: 0; max-height: 430px; overflow: auto; padding: 12px; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 14px 32px rgba(0,0,0,.18); }
-.notification-panel header { display: flex; justify-content: space-between; align-items: center; }
-.notification-item { width: 100%; display: flex; gap: 10px; text-align: left; padding: 10px; background: transparent; border: 0; border-radius: 8px; }
-.notification-item.unread { background: #eef4ff; }
-.notification-item img, .mention-autocomplete img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.notification-item span, .mention-autocomplete span { display: grid; gap: 2px; }
+.mention-autocomplete img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.mention-autocomplete span { display: grid; gap: 2px; }
 .mention-autocomplete { position: absolute; z-index: 35; bottom: 100%; left: 12px; width: min(360px, calc(100% - 24px)); max-height: 260px; overflow: auto; padding: 6px; border: 1px solid #ddd; border-radius: 10px; background: white; box-shadow: 0 10px 28px rgba(0,0,0,.16); }
 .mention-autocomplete button { width: 100%; display: flex; gap: 10px; align-items: center; padding: 8px; border: 0; background: transparent; text-align: left; border-radius: 7px; }
 .mention-autocomplete button.active, .mention-autocomplete button:hover { background: #eef4ff; }
@@ -354,7 +350,6 @@ input:focus {
     background: #f9fafb;
 }
 .message-row.search-highlight{background:rgba(255,215,96,.22);box-shadow:inset 3px 0 #e5a50a;transition:background .4s ease;}
-.search-filters{display:flex;gap:4px;flex-wrap:wrap;padding:6px}.search-filters button.active{background:#611f69;color:#fff}
 
 .message-avatar {
     display: grid;
@@ -501,7 +496,7 @@ input:focus {
     opacity: 0.55;
 }
 
-.global-search{position:relative;padding:10px 12px}.global-search input{box-sizing:border-box;width:100%;padding:9px 11px;border:1px solid #ffffff33;border-radius:7px;background:#ffffff14;color:#fff}.search-results{position:absolute;z-index:20;left:12px;right:12px;top:52px;max-height:340px;overflow:auto;border-radius:8px;background:#fff;color:#1d1c1d;box-shadow:0 8px 28px #0005}.search-results button{display:flex;width:100%;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:0;border-bottom:1px solid #eee;background:#fff;text-align:left}.search-results button:hover{background:#f4f4f4}.search-results span,.search-results small{color:#616061}
+.global-search { position: relative; padding: 10px 12px; }
 .message-extras{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.message-extras button{border:1px solid #ddd;border-radius:12px;background:#fff;padding:2px 7px;color:#454245}.message-extras button.active{border-color:#1264a3;background:#e8f5fa;color:#1264a3}.attachment-preview{display:block;max-width:320px;max-height:240px;margin-top:8px;border-radius:8px}.attachment-card{display:block;margin-top:6px;color:#1264a3}.file-picker{cursor:pointer;color:#1264a3}.file-picker input{display:none}.typing-indicator{min-height:18px;padding:0 10px;color:#616061}
 .thread-panel{position:absolute;z-index:15;top:0;right:0;bottom:0;width:min(390px,90%);padding:16px;border-left:1px solid #ddd;background:#fff;box-shadow:-5px 0 18px #0002}.thread-panel header{display:flex;align-items:center;justify-content:space-between}.thread-panel header button{border:0;background:none;font-size:24px}.thread-messages{height:calc(100% - 150px);overflow:auto}.thread-messages article{padding:8px 0;border-bottom:1px solid #eee}.thread-panel form{display:flex;gap:8px}.thread-panel textarea{flex:1;resize:none}.channel-content{position:relative}
 
@@ -1073,3 +1068,23 @@ input:focus {
 .profile-placeholder-avatar { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; border-radius: 50%; background: #1264a3; color: white; font-weight: 800; }
 .profile-placeholder p { margin: 13px 0; font-size: 13px; line-height: 1.45; }
 .profile-placeholder .secondary-button { width: 100%; }
+
+/* Light popup surfaces must not inherit the sidebar's white foreground. */
+.create-channel-modal,
+.channel-members-modal,
+.conversation-menu,
+.mention-autocomplete,
+.thread-panel {
+    color: #1f2937;
+}
+
+/* Override the composer's green/white button treatment for mention suggestions. */
+.message-composer .mention-autocomplete button {
+    background: transparent;
+    color: #1f2937;
+}
+
+.message-composer .mention-autocomplete button.active,
+.message-composer .mention-autocomplete button:hover:not(:disabled) {
+    background: #eef4ff;
+}
