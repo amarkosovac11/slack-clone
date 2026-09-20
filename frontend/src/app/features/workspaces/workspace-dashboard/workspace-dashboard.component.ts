@@ -49,7 +49,7 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
     NotificationPanelComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
-  styleUrls: ['./workspace-dashboard.component.css', './workspace-conversations.css', './workspace-navigation.css'],
+  styleUrls: ['./workspace-dashboard.component.css', './workspace-conversations.css', './workspace-navigation.css', './workspace-messages.css'],
 })
 export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 

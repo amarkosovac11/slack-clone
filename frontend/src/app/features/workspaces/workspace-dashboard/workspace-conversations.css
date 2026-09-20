@@ -1,75 +1,3 @@
-.dm-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 10px 8px;
-    color: #d1c4d2;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.dm-heading button {
-    display: grid;
-    width: 26px;
-    height: 26px;
-    place-items: center;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: #e9d5ea;
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.dm-heading button:hover,
-.dm-heading button:focus-visible {
-    background: rgb(255 255 255 / 14%);
-    color: white;
-    outline: none;
-}
-
-.dm-item {
-    position: relative;
-    width: 100%;
-}
-
-.dm-item.active {
-    background: #1264a3;
-    color: white;
-}
-
-.dm-avatar {
-    display: grid;
-    width: 24px;
-    height: 24px;
-    flex: 0 0 24px;
-    place-items: center;
-    border-radius: 6px;
-    background: rgb(255 255 255 / 14%);
-    color: white;
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.dm-group-icon {
-    font-size: 13px;
-    line-height: 1;
-}
-
-.unread-badge {
-    min-width: 20px;
-    margin-left: auto;
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: white;
-    color: #3f0e40;
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1.35;
-    text-align: center;
-}
-
 .conversation-heading {
     display: flex;
     min-width: 0;
@@ -95,7 +23,7 @@
     border-radius: 9px;
     background: #f3e8ff;
     color: #611f69;
-    font-weight: 800;
+    font-weight: 650;
 }
 
 .composer-hint {
@@ -109,7 +37,7 @@
     margin: 0 auto 12px;
     padding: 7px 13px;
     border: 1px solid #d1d5db;
-    border-radius: 999px;
+    border-radius: var(--radius-control);
     background: white;
     color: #4b5563;
     font: inherit;
@@ -191,7 +119,7 @@
     border-radius: 8px;
     background: #611f69;
     color: white;
-    font-weight: 800;
+    font-weight: 650;
 }
 
 .dm-selection-summary {

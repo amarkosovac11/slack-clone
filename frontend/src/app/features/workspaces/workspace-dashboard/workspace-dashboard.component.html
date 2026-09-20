@@ -219,7 +219,7 @@
       <header class="channel-header conversation-header">
         <div class="conversation-heading">
           <span class="conversation-header-avatar" aria-hidden="true">
-            @if (conversation.type === 'GROUP') { &#128101; } @else { {{ conversation.displayName.charAt(0).toUpperCase() }} }
+            @if (conversation.type === 'GROUP') { <app-icon name="people" /> } @else { {{ conversation.displayName.charAt(0).toUpperCase() }} }
           </span>
           <div>
             <h2>{{ conversation.displayName }}</h2>
@@ -227,8 +227,8 @@
             @else { <button type="button" class="conversation-members-link" (click)="openGroupMembers()">{{ conversation.participants.length }} members</button> }
           </div>
         </div>
-        <div class="conversation-menu-wrap">
-          <button type="button" class="conversation-menu-button" aria-label="Conversation settings" (click)="toggleConversationMenu()">&#8942;</button>
+        <div class="conversation-menu-wrap" (keydown.escape)="showConversationMenu.set(false)">
+          <button type="button" class="conversation-menu-button" aria-label="Conversation settings" [attr.aria-expanded]="showConversationMenu()" (click)="toggleConversationMenu()"><app-icon name="more" /></button>
           @if (showConversationMenu()) {
             <div class="conversation-menu">
               @if (conversation.type === 'GROUP') {
@@ -244,7 +244,7 @@
       <div class="message-area">
         @if (conversationCursor() !== null) { <button type="button" class="load-older-button" [disabled]="conversationLoading()" (click)="loadOlderConversationMessages()">Load older messages</button> }
         @if (conversationError()) { <div class="messages-state messages-error">{{ conversationError() }}</div> }
-        @if (!conversationLoading() && conversationMessages().length === 0) { <div class="message-empty-state"><div class="welcome-icon">&#9993;</div><h1>{{ conversation.displayName }}</h1><span>This is the beginning of your conversation.</span></div> }
+        @if (!conversationLoading() && conversationMessages().length === 0) { <div class="message-empty-state"><div class="welcome-icon"><app-icon name="message" /></div><h1>{{ conversation.displayName }}</h1><span>This is the beginning of your conversation.</span></div> }
         <div class="message-list">
           @for (message of conversationMessages(); track message.id) {
             <article class="message-row" [id]="'message-'+message.id" [class.search-highlight]="highlightedMessageId()===message.id"><div class="message-avatar">{{ message.senderDisplayName.charAt(0).toUpperCase() }}</div><div class="message-content">
@@ -258,7 +258,7 @@
               } @else { <p class="message-text">{{ message.content }} @if (message.updatedAt !== message.createdAt) { <small class="edited-label">(edited)</small> }</p> }
               @if(message.mentions.length){<div class="mention-list">@for(mention of message.mentions;track mention.userId){<span class="mention-chip">&#64;{{mention.username}}</span>}</div>}
               @for(attachment of message.attachments;track attachment.id){@if(attachment.mimeType.startsWith('image/')){@if(attachmentUrl(attachment);as imageUrl){<button type="button" class="attachment-image-button" (click)="downloadAttachment(attachment)"><img class="attachment-preview" [src]="imageUrl" [alt]="attachment.originalFileName"></button>}}@else{<button type="button" class="attachment-card" (click)="downloadAttachment(attachment)">{{attachment.originalFileName}}</button>}}
-              <div class="message-extras">@for(reaction of message.reactions;track reaction.emoji){<button type="button" [class.active]="reactedByCurrentUser(reaction)" (click)="toggleConversationReaction(message,reaction.emoji)">{{reaction.emoji}} {{reaction.count}}</button>}<button type="button" (click)="toggleConversationReaction(message,'👍')">＋ 👍</button><button type="button" (click)="openConversationThread(message)">Thread @if(message.replyCount){({{message.replyCount}})}</button></div>
+              <div class="message-extras">@for(reaction of message.reactions;track reaction.emoji){<button type="button" [class.active]="reactedByCurrentUser(reaction)" [attr.aria-pressed]="reactedByCurrentUser(reaction)" [title]="reaction.users.join(', ')" (click)="toggleConversationReaction(message,reaction.emoji)">{{reaction.emoji}} {{reaction.count}}</button>}<button type="button" (click)="toggleConversationReaction(message,'👍')">＋ 👍</button><button type="button" (click)="openConversationThread(message)" class="thread-link"><app-icon name="message" />Thread @if(message.replyCount){({{message.replyCount}})}</button></div>
               @if(message.senderId===currentUser()?.id){<small class="receipt-label" [title]="receiptTitle(message.id)">{{receiptLabel(message.id)}}</small>}
               </div>
               @if (!message.deletedAt && message.senderId === currentUser()?.id && editingConversationMessageId() !== message.id) {
@@ -270,57 +270,34 @@
       </div>
       <form class="message-composer" [formGroup]="conversationMessageForm" (ngSubmit)="sendConversationMessage()">
         <textarea formControlName="content" rows="2" maxlength="4000" [placeholder]="'Message ' + conversation.displayName" aria-label="Direct message" (input)="onComposerInput('conversation',$event)" (keydown)="mentionKeydown($event)"></textarea>
-        @if(mentionSuggestions().length){<div class="mention-autocomplete">@for(user of mentionSuggestions();track user.userId;let index=$index){<button type="button" [class.active]="index===mentionActiveIndex()" (mousedown)="$event.preventDefault();selectMention(user)">@if(avatarSrc(user.avatarUrl);as avatar){<img [src]="avatar" alt="">}<span><strong>{{user.displayName}}</strong><small>&#64;{{user.username}}</small></span></button>}</div>}
+        @if(mentionSuggestions().length){<div class="mention-autocomplete">@for(user of mentionSuggestions();track user.userId;let index=$index){<button type="button" [class.active]="index===mentionActiveIndex()" (mousedown)="$event.preventDefault()" (click)="selectMention(user)">@if(avatarSrc(user.avatarUrl);as avatar){<img [src]="avatar" alt="">}<span><strong>{{user.displayName}}</strong><small>&#64;{{user.username}}</small></span></button>}</div>}
         @if(typingNames().length){<small class="typing-indicator">{{typingNames().join(', ')}} typing...</small>}
         <div class="message-composer-footer">
-          <label class="file-picker">Attach<input type="file" (change)="chooseFile($event)"></label><small>{{selectedFile()?.name}}</small>
-          <button type="submit" [disabled]="conversationMessageForm.invalid">Send</button>
+          <label class="file-picker" title="Attach a file"><app-icon name="attach" /><span>Attach</span><input type="file" aria-label="Attach a file" (change)="chooseFile($event)"></label>@if(selectedFile(); as file){<span class="selected-file" [title]="file.name">{{ file.name }}</span>}
+          <button type="submit" class="send-button" [disabled]="conversationMessageForm.invalid"><span>Send</span><app-icon name="send" /></button>
         </div>
       </form>
     } @else if (selectedChannel()) {
 
     <header class="channel-header">
-
-      <div>
+      <div class="channel-heading">
         <div class="channel-title-row">
-
-          <span class="channel-title-symbol">
-            {{ selectedChannel()!.privateChannel ? '🔒' : '#' }}
-          </span>
-
-          <h2>
-            {{ selectedChannel()!.name }}
-          </h2>
-
+          <app-icon [name]="selectedChannel()!.privateChannel ? 'lock' : 'hash'" />
+          <h2 [title]="selectedChannel()!.name">{{ selectedChannel()!.name }}</h2>
+          <span class="access-badge">{{ selectedChannel()!.privateChannel ? 'Private' : 'Public' }}</span>
+          @if (selectedChannel()!.archivedAt) { <span class="access-badge">Archived</span> }
         </div>
-
-        @if (selectedChannel()!.description) {
-        <p>
-          {{ selectedChannel()!.description }}
-        </p>
-        } @else {
-        <p>
-          No channel description.
-        </p>
+        <p [title]="selectedChannel()!.description || ''">{{ selectedChannel()!.description || 'A place to share ideas and keep your team in sync.' }}</p>
+      </div>
+      <div class="channel-header-actions">
+        @if (canManageSelectedChannelMembers()) {
+          <button type="button" class="header-action" title="Manage channel members" aria-label="Manage channel members" (click)="openChannelMembersModal()"><app-icon name="people" /><span>{{ channelMemberCount() ?? 'Members' }}</span></button>
         }
-
+        <button type="button" class="header-action" title="Pinned messages" aria-label="Pinned messages" (click)="openPinnedMessages()"><app-icon name="pin" /><span>Pins</span></button>
+        @if (canManageSelectedChannel()) {
+          <button type="button" class="header-action" title="Channel settings" aria-label="Channel settings" (click)="openChannelSettings()"><app-icon name="settings" /></button>
+        }
       </div>
-
-      @if (selectedChannel()!.privateChannel) {
-      <div class="channel-header-actions">
-        <span class="private-badge">
-          Private
-        </span>
-
-      </div>
-      } @else {
-      <div class="channel-header-actions">
-        <span class="public-access-label">All workspace members</span>
-        <span class="public-badge">Public</span>
-      </div>
-      }
-      <button type="button" class="secondary-button" (click)="openPinnedMessages()">Pinned messages</button>
-
     </header>
 
     <div class="message-area">
@@ -384,7 +361,7 @@
               <p class="message-text">{{ message.content }} @if (isEdited(message)) { <small class="edited-label">(edited)</small> }</p>
               @if(message.mentions.length){<div class="mention-list">@for(mention of message.mentions;track mention.userId){<span class="mention-chip">&#64;{{mention.username}}</span>}</div>}
               @for(attachment of message.attachments;track attachment.id){@if(attachment.mimeType.startsWith('image/')){@if(attachmentUrl(attachment);as imageUrl){<button type="button" class="attachment-image-button" (click)="downloadAttachment(attachment)"><img class="attachment-preview" [src]="imageUrl" [alt]="attachment.originalFileName"></button>}}@else{<button type="button" class="attachment-card" (click)="downloadAttachment(attachment)">{{attachment.originalFileName}}</button>}}
-              <div class="message-extras">@for(reaction of message.reactions;track reaction.emoji){<button type="button" [class.active]="reactedByCurrentUser(reaction)" [disabled]="!!selectedChannel()?.archivedAt" (click)="toggleChannelReaction(message,reaction.emoji)">{{reaction.emoji}} {{reaction.count}}</button>}@if(!selectedChannel()?.archivedAt){<button type="button" (click)="toggleChannelReaction(message,'👍')">＋ 👍</button>}<button type="button" (click)="openChannelThread(message)">Thread @if(message.replyCount){({{message.replyCount}})}</button></div>
+              <div class="message-extras">@for(reaction of message.reactions;track reaction.emoji){<button type="button" [class.active]="reactedByCurrentUser(reaction)" [attr.aria-pressed]="reactedByCurrentUser(reaction)" [title]="reaction.users.join(', ')" [disabled]="!!selectedChannel()?.archivedAt" (click)="toggleChannelReaction(message,reaction.emoji)">{{reaction.emoji}} {{reaction.count}}</button>}@if(!selectedChannel()?.archivedAt){<button type="button" (click)="toggleChannelReaction(message,'👍')">＋ 👍</button>}<button type="button" (click)="openChannelThread(message)" class="thread-link"><app-icon name="message" />Thread @if(message.replyCount){({{message.replyCount}})}</button></div>
             }
           </div>
           @if (!message.deletedAt && !selectedChannel()?.archivedAt && message.senderId === currentUser()?.id && editingMessageId() !== message.id) {
@@ -393,7 +370,7 @@
               <button type="button" class="message-delete-button" (click)="requestMessageDelete(message)">Delete</button>
             </div>
           }
-          @if(!message.deletedAt && !selectedChannel()?.archivedAt){<div class="message-actions"><button type="button" (click)="togglePin(message)">{{message.pinned?'Unpin':'Pin'}}</button></div>}
+          @if(!message.deletedAt && !selectedChannel()?.archivedAt){<div class="message-actions"><button type="button" [attr.aria-pressed]="message.pinned" (click)="togglePin(message)"><app-icon name="pin" />{{message.pinned?'Unpin':'Pin'}}</button></div>}
         </article>
         }
       </div>
@@ -411,17 +388,18 @@
         formControlName="content"
         rows="2"
         maxlength="4000"
+        aria-label="Channel message"
         [placeholder]="'Message #' + selectedChannel()!.name"
         [disabled]="isSendingMessage()"
         (input)="onComposerInput('channel',$event)"
         (keydown)="mentionKeydown($event)"
       ></textarea>
-      @if(mentionSuggestions().length){<div class="mention-autocomplete">@for(user of mentionSuggestions();track user.userId;let index=$index){<button type="button" [class.active]="index===mentionActiveIndex()" (mousedown)="$event.preventDefault();selectMention(user)">@if(avatarSrc(user.avatarUrl);as avatar){<img [src]="avatar" alt="">}<span><strong>{{user.displayName}}</strong><small>&#64;{{user.username}}</small></span></button>}</div>}
+      @if(mentionSuggestions().length){<div class="mention-autocomplete">@for(user of mentionSuggestions();track user.userId;let index=$index){<button type="button" [class.active]="index===mentionActiveIndex()" (mousedown)="$event.preventDefault()" (click)="selectMention(user)">@if(avatarSrc(user.avatarUrl);as avatar){<img [src]="avatar" alt="">}<span><strong>{{user.displayName}}</strong><small>&#64;{{user.username}}</small></span></button>}</div>}
       @if(typingNames().length){<small class="typing-indicator">{{typingNames().join(', ')}} typing...</small>}
 
       <div class="message-composer-footer">
         <div>
-          <label class="file-picker">Attach<input type="file" (change)="chooseFile($event)"></label><small>{{selectedFile()?.name}}</small>
+          <label class="file-picker" title="Attach a file"><app-icon name="attach" /><span>Attach</span><input type="file" aria-label="Attach a file" (change)="chooseFile($event)"></label>@if(selectedFile(); as file){<span class="selected-file" [title]="file.name">{{ file.name }}</span>}
           @if (
             messageForm.controls.content.touched &&
             messageForm.controls.content.hasError('required')
@@ -437,32 +415,45 @@
 
         <button
           type="submit"
+          class="send-button"
           [disabled]="isSendingMessage() || messageForm.invalid"
         >
-          {{ isSendingMessage() ? 'Sending...' : 'Send' }}
+          <span>{{ isSendingMessage() ? 'Sending...' : 'Send' }}</span><app-icon name="send" />
         </button>
       </div>
     </form>
       } @else { <div class="archived-readonly-notice">This channel is archived and read-only.</div> }
 
-    @if(threadRootId()) { <aside class="thread-panel"><header><h3>Thread</h3><button type="button" (click)="closeThread()">×</button></header><div class="thread-messages">@for(reply of channelThread();track reply.id){<article><strong>{{reply.senderDisplayName}}</strong><p>{{reply.deletedAt?'Message deleted':reply.content}}</p></article>}@for(reply of conversationThread();track reply.id){<article><strong>{{reply.senderDisplayName}}</strong><p>{{reply.deletedAt?'Message deleted':reply.content}}</p></article>}</div>@if(!selectedChannel()?.archivedAt){<form [formGroup]="threadReplyForm" (ngSubmit)="sendThreadReply()"><textarea formControlName="content" placeholder="Reply in thread"></textarea><button type="submit" [disabled]="threadReplyForm.invalid">Reply</button></form>}@else{<p class="archived-readonly-notice">Archived threads are read-only.</p>}</aside> }
+
 
     } @else {
 
     <div class="select-channel-state">
-
-      <div class="select-channel-icon">
-        #
+      <div class="empty-state-art"><app-icon name="message" /><span class="empty-state-hash"><app-icon name="hash" /></span></div>
+      <span class="empty-state-eyebrow">Your team, connected</span>
+      <h1>{{ isLoading() ? 'Getting your workspace ready' : selectedWorkspace() ? 'Welcome to ' + selectedWorkspace()!.name : 'Make room for your team' }}</h1>
+      <p>{{ selectedWorkspace() ? 'Choose a channel to catch up, share an idea, or start a conversation with your team.' : 'Create a workspace or accept an invitation to bring your conversations together.' }}</p>
+      <div class="empty-state-actions">
+        @if (selectedWorkspace()) {
+          <button type="button" class="primary-button" (click)="openStartConversationModal()"><app-icon name="edit" />New message</button>
+          <button type="button" class="secondary-button" (click)="openCreateChannelModal()"><app-icon name="plus" />Create channel</button>
+        } @else if (!isLoading()) {
+          <button type="button" class="primary-button" (click)="openCreateWorkspaceModal()"><app-icon name="plus" />Create workspace</button>
+        }
       </div>
-
-      <h2>Select a channel</h2>
-
-      <p>
-        Choose a channel from the sidebar to open it.
-      </p>
-
     </div>
-
+    }
+    @if(threadRootId()) {
+      <aside class="thread-panel" aria-label="Message thread">
+        <header><div><h3>Thread</h3><p>Keep the conversation going</p></div><button type="button" aria-label="Close thread" (click)="closeThread()"><app-icon name="close" /></button></header>
+        <div class="thread-messages">
+          @for(reply of channelThread();track reply.id){<article><strong>{{reply.senderDisplayName}}</strong><p>{{reply.deletedAt?'Message deleted':reply.content}}</p></article>}
+          @for(reply of conversationThread();track reply.id){<article><strong>{{reply.senderDisplayName}}</strong><p>{{reply.deletedAt?'Message deleted':reply.content}}</p></article>}
+          @if (!channelThread().length && !conversationThread().length) { <p class="thread-empty">Replies will appear here.</p> }
+        </div>
+        @if(!selectedChannel()?.archivedAt){<form [formGroup]="threadReplyForm" (ngSubmit)="sendThreadReply()"><textarea formControlName="content" aria-label="Reply in thread" placeholder="Reply in thread" rows="3"></textarea><button type="submit" class="primary-button" [disabled]="threadReplyForm.invalid"><app-icon name="send" />Reply</button></form>}
+        @else{<p class="archived-readonly-notice">Archived threads are read-only.</p>}
+      </aside>
     }
 
   </main>
