@@ -315,6 +315,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         return;
       }
 
+      if (this.selectedChannel()?.id !== channel.id) this.closeThread();
       this.resetChannelMembersModal();
       this.selectedChannel.set(channel);
       this.loadPrivateChannelMemberCount(workspaceId, channel);
@@ -608,6 +609,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   openConversation(id: number, navigate = true): void {
     if (this.selectedConversation()?.id === id && !navigate) return;
+    this.closeThread();
     this.messageWebSocketService.unsubscribeFromChannel();this.clearAttachmentObjectUrls();
     this.selectedChannel.set(null); this.messages.set([]); this.conversationError.set(null);
     this.conversationLoading.set(true); this.conversationMessages.set([]); this.conversationCursor.set(null);this.conversationReceipts.set({});
@@ -794,6 +796,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   private closeConversationSelection(): void {
+    this.closeThread();
     this.conversationWebSocketService.unsubscribeConversation(); this.selectedConversation.set(null);
     this.conversationMessages.set([]); this.conversationCursor.set(null);
     this.showConversationMenu.set(false); this.editingConversationMessageId.set(null); this.conversationMessagePendingDelete.set(null);
@@ -1151,6 +1154,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     workspaceId: number,
     channelId: number | null = null
   ): void {
+    this.closeThread();
     this.messageWebSocketService.unsubscribeFromChannel();
     this.resetChannelMembersModal();
 
@@ -1295,7 +1299,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         this.workspaces.set(workspaces);
         this.isLoading.set(false);
         const conversationRouteId = this.parsePositiveRouteId(this.route.snapshot.paramMap.get('conversationId'));
-        if (conversationRouteId !== null && workspaces.length > 0) this.selectedWorkspaceId.set(workspaces[0].id);
+        if (conversationRouteId !== null && workspaces.length > 0) {
+          const workspaceId = this.selectedWorkspaceId() ?? workspaces[0].id;
+          this.selectedWorkspaceId.set(workspaceId);
+          this.loadSidebarChannels(workspaceId);
+        }
         this.syncSelectionFromRoute();
         if (this.selectedWorkspaceId() === null && workspaces.length > 0) {
           this.selectWorkspace(workspaces[0].id);
@@ -1304,6 +1312,24 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       error: () => {
         this.errorMessage.set('Could not load workspaces.');
         this.isLoading.set(false);
+      },
+    });
+  }
+
+  // A DM route needs workspace navigation without replacing the active conversation.
+  private loadSidebarChannels(workspaceId: number): void {
+    this.channelsLoading.set(true);
+    this.channelsError.set(null);
+    this.channelService.getChannels(workspaceId).subscribe({
+      next: channels => {
+        if (this.selectedWorkspaceId() !== workspaceId) return;
+        this.channels.set(channels);
+        this.channelsLoading.set(false);
+      },
+      error: () => {
+        if (this.selectedWorkspaceId() !== workspaceId) return;
+        this.channelsError.set('Could not load channels.');
+        this.channelsLoading.set(false);
       },
     });
   }
