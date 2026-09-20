@@ -1,3 +1,4 @@
+import { IconComponent } from '../../../shared/ui/icon.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
@@ -13,7 +14,7 @@ import { WorkspaceInvitationService } from '../workspace-invitation.service';
 @Component({
   selector: 'app-workspace-invitation-management',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [IconComponent, CommonModule, ReactiveFormsModule],
   templateUrl: './workspace-invitation-management.component.html',
   styleUrl: './workspace-invitation-management.component.css',
 })

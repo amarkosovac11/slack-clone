@@ -80,7 +80,7 @@
   </div>
 }
 
-@if (selectedWorkspaceId() || selectedConversation()) {
+@if (currentUser()) {
 
 <section class="workspace-view">
 
@@ -88,81 +88,60 @@
     <div class="workspace-rail-list">
       @for (workspace of workspaces(); track workspace.id) {
         <button type="button" class="workspace-rail-button"
-          [class.active]="isWorkspaceSelected(workspace.id)"
+          [class.active]="isWorkspaceSelected(workspace.id)" [attr.aria-current]="isWorkspaceSelected(workspace.id) ? 'true' : null"
           [title]="workspace.name" [attr.aria-label]="'Switch to ' + workspace.name"
           (click)="selectWorkspace(workspace.id)">{{ workspaceInitial(workspace.name) }}</button>
       }
       <button type="button" class="workspace-rail-button create-rail-button"
-        title="Create workspace" aria-label="Create workspace" (click)="openCreateWorkspaceModal()">+</button>
+        title="Create workspace" aria-label="Create workspace" (click)="openCreateWorkspaceModal()"><app-icon name="plus" /></button>
       <app-pending-workspace-invitations class="rail-invitations" [compact]="true"
         (invitationAccepted)="loadWorkspaces()" />
-    </div>
-    <div class="profile-rail-entry">
-      <button type="button" class="workspace-rail-button user-rail-button"
-        title="Account" aria-label="Open account menu" aria-haspopup="dialog"
-        [attr.aria-expanded]="showProfilePlaceholder()"
-        (click)="toggleProfilePlaceholder()">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="" />}@else { {{ userInitial() }} }<span class="presence-dot online" title="Online"><span class="sr-only">Online</span></span></button>
-      @if (showProfilePlaceholder()) {
-        <section class="profile-placeholder" role="dialog" aria-label="Account menu">
-          <div class="profile-placeholder-header">
-            <span class="profile-placeholder-avatar">@if(avatarSrc(currentUser()?.avatarUrl);as avatar){<img [src]="avatar" alt="" />}@else { {{ userInitial() }} }</span>
-            <div><strong>{{ currentUser()?.displayName }}</strong><small>{{ currentUser()?.presence ?? 'ONLINE' | titlecase }}@if(currentUser()?.customStatusText){ · {{currentUser()?.customStatusEmoji}} {{currentUser()?.customStatusText}}}</small></div>
-          </div>
-          <button type="button" (click)="openProfile()">Profile & settings</button>
-          <button type="button" (click)="openStatus()">Set a status</button>
-          <button type="button" class="destructive-menu-item" (click)="logout()">Sign out</button>
-        </section>
-      }
     </div>
   </nav>
 
   <aside class="channel-sidebar">
-    <app-search-panel [workspaceId]="selectedWorkspaceId()" (selected)="openSearchHit($event)"></app-search-panel>
-    <div class="global-search">
-      <button type="button" class="notification-bell" aria-label="Notifications" (click)="showNotifications.set(!showNotifications())">🔔@if(notificationService.unreadCount()>0){<span>{{notificationService.unreadCount()}}</span>}</button>
-      @if(showNotifications()){<app-notification-panel (selected)="openNotification($event)"></app-notification-panel>}
-    </div>
-
-    @if (selectedWorkspace()) {
-
-    <div class="channel-sidebar-header">
-      <div>
-        <h2>{{ selectedWorkspace()!.name }}</h2>
-        <span class="sidebar-role">{{ selectedWorkspace()!.currentUserRole }}</span>
+    <header class="channel-sidebar-header">
+      <div class="workspace-heading">
+        <span class="sidebar-label">Workspace</span>
+        <h2 [title]="selectedWorkspace()?.name || 'Your conversations'">{{ selectedWorkspace()?.name || 'Your conversations' }}</h2>
+        @if (selectedWorkspace(); as workspace) { <span class="sidebar-role">{{ workspace.currentUserRole | titlecase }}</span> }
       </div>
-
-      <button type="button" class="add-channel-button" title="Create channel" (click)="openCreateChannelModal()">
-        +
-      </button>
+      <button type="button" class="sidebar-icon-button" title="New message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()"><app-icon name="edit" /></button>
+    </header>
+    <div class="sidebar-utilities">
+      <app-search-panel [workspaceId]="selectedWorkspaceId()" (selected)="openSearchHit($event)"></app-search-panel>
+      <div class="notifications-control" (keydown.escape)="showNotifications.set(false)">
+        <button type="button" class="notification-bell sidebar-icon-button" title="Notifications" aria-label="Notifications"
+          [attr.aria-expanded]="showNotifications()" aria-controls="notifications-popup" (click)="showNotifications.set(!showNotifications())">
+          <app-icon name="bell" />@if(notificationService.unreadCount()>0){<span>{{notificationService.unreadCount()}}</span>}
+        </button>
+        @if(showNotifications()){<app-notification-panel id="notifications-popup" (selected)="openNotification($event)"></app-notification-panel>}
+      </div>
     </div>
-
-    <div class="channel-divider"></div>
-
-    <div class="workspace-actions">
-      <app-workspace-settings
-        [workspace]="selectedWorkspace()!"
-        [currentUserId]="currentUser()!.id"
-        (workspaceUpdated)="workspaceUpdated($event)"
-        (workspaceDeleted)="workspaceDeleted($event)"
-        (workspaceLeft)="workspaceLeft($event)"
-      />
-      <app-workspace-members
-        [workspaceId]="selectedWorkspace()!.id"
-        [workspaceName]="selectedWorkspace()!.name"
-        [currentUserRole]="selectedWorkspace()!.currentUserRole"
-        [currentUserId]="currentUser()!.id"
-      />
-
-    @if (canManageSelectedWorkspaceInvitations()) {
-      <app-workspace-invitation-management
-        [workspaceId]="selectedWorkspace()!.id"
-        [workspaceName]="selectedWorkspace()!.name"
-      />
-    }
-    </div>
-
-    <div class="channel-divider"></div>
-
+    <div class="sidebar-scroll">
+      <details class="workspace-tools">
+        <summary><app-icon name="settings" /><span>Workspace tools</span><app-icon name="chevron" /></summary>
+        <div class="workspace-actions">
+          @if (selectedWorkspace(); as workspace) {
+            <app-workspace-settings [workspace]="workspace" [currentUserId]="currentUser()!.id"
+              (workspaceUpdated)="workspaceUpdated($event)" (workspaceDeleted)="workspaceDeleted($event)" (workspaceLeft)="workspaceLeft($event)" />
+            <app-workspace-members [workspaceId]="workspace.id" [workspaceName]="workspace.name"
+              [currentUserRole]="workspace.currentUserRole" [currentUserId]="currentUser()!.id" />
+            @if (canManageSelectedWorkspaceInvitations()) {
+              <app-workspace-invitation-management [workspaceId]="workspace.id" [workspaceName]="workspace.name" />
+            }
+            @if (canManageSelectedChannel()) {
+              <button type="button" class="channel-item" (click)="openArchivedChannels()"><app-icon name="archive" /><span class="channel-name">Archived channels</span></button>
+            }
+          }
+          <button type="button" class="channel-item" (click)="openHiddenConversations()"><app-icon name="eyeOff" /><span class="channel-name">Hidden conversations</span></button>
+        </div>
+      </details>
+    @if (selectedWorkspace()) {
+      <div class="channel-group-title">
+        <h3>Channels <span class="section-count">{{ channels().length }}</span></h3>
+        <button type="button" class="sidebar-icon-button" title="Create channel" aria-label="Create channel" (click)="openCreateChannelModal()"><app-icon name="plus" /></button>
+      </div>
     @if (channelsLoading()) {
 
     <div class="channel-state">
@@ -183,20 +162,14 @@
 
     } @else {
 
-    <div class="channel-group-title">
-      Channels
-    </div>
-
     <div class="channel-list">
 
       @for (channel of channels(); track channel.id) {
 
       <div class="channel-row" [class.active]="selectedChannel()?.id === channel.id">
-      <button type="button" class="channel-item" (click)="selectChannel(channel)">
+      <button type="button" class="channel-item" [title]="channel.name" [attr.aria-current]="selectedChannel()?.id === channel.id ? 'page' : null" (click)="selectChannel(channel)">
 
-        <span class="channel-symbol">
-          {{ channel.privateChannel ? '🔒' : '#' }}
-        </span>
+        <span class="channel-symbol"><app-icon [name]="channel.privateChannel ? 'lock' : 'hash'" />@if(channel.privateChannel){<span class="sr-only">Private channel: </span>}</span>
 
         <span class="channel-name">
           {{ channel.name }}
@@ -206,7 +179,7 @@
       @if (canManageSelectedChannel()) {
         <button type="button" class="sidebar-channel-settings-button" title="Channel settings"
           [attr.aria-label]="'Open settings for ' + channel.name"
-          (click)="openChannelSettingsFromSidebar($event, channel)">&#9881;</button>
+          (click)="openChannelSettingsFromSidebar($event, channel)"><app-icon name="more" /></button>
       }
       </div>
 
@@ -216,20 +189,17 @@
 
     }
 
-    <div class="channel-divider"></div>
     }
     <div class="dm-heading">
-      <span>Direct messages</span>
-      <button type="button" title="Start a new message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()">+</button>
+      <h3>Direct messages <span class="section-count">{{ conversations().length }}</span></h3>
+      <button type="button" class="sidebar-icon-button" title="Start a new message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()"><app-icon name="plus" /></button>
     </div>
-    <button type="button" class="channel-item" (click)="openHiddenConversations()"><span class="channel-name">Hidden conversations</span></button>
-    @if(selectedWorkspaceRole()==='OWNER'||selectedWorkspaceRole()==='ADMIN'){<button type="button" class="channel-item" (click)="openArchivedChannels()"><span class="channel-name">Archived channels</span></button>}
     @if (conversationsLoading()) { <div class="channel-state">Loading direct messages...</div> }
     <div class="channel-list">
       @for (conversation of conversations(); track conversation.id) {
-        <button type="button" class="channel-item dm-item" [class.active]="selectedConversation()?.id === conversation.id" (click)="openConversation(conversation.id)">
+        <button type="button" class="channel-item dm-item" [title]="conversation.displayName" [attr.aria-current]="selectedConversation()?.id === conversation.id ? 'page' : null" [class.active]="selectedConversation()?.id === conversation.id" (click)="openConversation(conversation.id)">
           <span class="dm-avatar" aria-hidden="true">
-            @if (conversation.type === 'GROUP') { <span class="dm-group-icon">&#128101;</span> }
+            @if (conversation.type === 'GROUP') { <app-icon name="people" /> }
             @else { {{ conversation.displayName.charAt(0).toUpperCase() }} }
           </span>
           <span class="channel-name">{{ conversation.displayName }}</span>
@@ -237,6 +207,10 @@
         </button>
       }
     </div>
+    @if (!conversationsLoading() && conversations().length === 0) { <p class="channel-state">Start a conversation with someone on your team.</p> }
+    </div>
+    <app-user-profile [user]="currentUser()" [avatarUrl]="avatarSrc(currentUser()?.avatarUrl)"
+      (profile)="openProfile()" (status)="openStatus()" (logout)="logout()" />
   </aside>
 
   <main class="channel-content">

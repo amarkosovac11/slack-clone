@@ -1,3 +1,5 @@
+import { IconComponent } from '../../../shared/ui/icon.component';
+import { UserProfileComponent } from '../../../shared/ui/user-profile.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
@@ -36,6 +38,8 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
   standalone: true,
   imports: [
     CommonModule,
+    IconComponent,
+    UserProfileComponent,
     ReactiveFormsModule,
     PendingWorkspaceInvitationsComponent,
     WorkspaceInvitationManagementComponent,
@@ -45,7 +49,7 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
     NotificationPanelComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
-  styleUrl: './workspace-dashboard.component.css',
+  styleUrls: ['./workspace-dashboard.component.css', './workspace-conversations.css', './workspace-navigation.css'],
 })
 export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 

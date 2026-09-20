@@ -7,8 +7,8 @@
   position: absolute;
   z-index: 40;
   top: calc(100% + 8px);
-  left: 0;
-  right: 0;
+  left: 16px;
+  right: 16px;
   max-height: min(440px, 70vh);
   overflow: auto;
   padding: 12px;
