@@ -49,7 +49,7 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
     NotificationPanelComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
-  styleUrls: ['./workspace-dashboard.component.css', './workspace-conversations.css', './workspace-navigation.css', './workspace-messages.css'],
+  styleUrls: ['./workspace-dashboard.component.css', './workspace-conversations.css', './workspace-navigation.css', './workspace-messages.css', './workspace-responsive.css'],
 })
 export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
@@ -65,6 +65,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly showProfileModal = signal(false);
   readonly showStatusModal = signal(false);
   readonly showNotifications=signal(false);
+  readonly showNavigation = signal(false);
   readonly profileSaving = signal(false);
   readonly profileError = signal<string | null>(null);
   readonly userPresence = signal<Record<number,'ONLINE'|'AWAY'|'OFFLINE'>>({});

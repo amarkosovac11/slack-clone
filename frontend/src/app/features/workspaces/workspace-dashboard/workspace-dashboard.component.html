@@ -82,7 +82,7 @@
 
 @if (currentUser()) {
 
-<section class="workspace-view">
+<section class="workspace-view" [class.navigation-open]="showNavigation()">
 
   <nav class="workspace-rail" aria-label="Workspaces">
     <div class="workspace-rail-list">
@@ -99,7 +99,9 @@
     </div>
   </nav>
 
-  <aside class="channel-sidebar">
+  @if (showNavigation()) { <button type="button" class="sidebar-scrim" aria-label="Close navigation" (click)="showNavigation.set(false)"></button> }
+  <aside id="workspace-navigation" class="channel-sidebar" aria-label="Workspace navigation">
+    <button type="button" class="mobile-sidebar-close sidebar-icon-button" aria-label="Close navigation" (click)="showNavigation.set(false)"><app-icon name="close" /></button>
     <header class="channel-sidebar-header">
       <div class="workspace-heading">
         <span class="sidebar-label">Workspace</span>
@@ -167,7 +169,7 @@
       @for (channel of channels(); track channel.id) {
 
       <div class="channel-row" [class.active]="selectedChannel()?.id === channel.id">
-      <button type="button" class="channel-item" [title]="channel.name" [attr.aria-current]="selectedChannel()?.id === channel.id ? 'page' : null" (click)="selectChannel(channel)">
+      <button type="button" class="channel-item" [title]="channel.name" [attr.aria-current]="selectedChannel()?.id === channel.id ? 'page' : null" (click)="selectChannel(channel); showNavigation.set(false)">
 
         <span class="channel-symbol"><app-icon [name]="channel.privateChannel ? 'lock' : 'hash'" />@if(channel.privateChannel){<span class="sr-only">Private channel: </span>}</span>
 
@@ -197,7 +199,7 @@
     @if (conversationsLoading()) { <div class="channel-state">Loading direct messages...</div> }
     <div class="channel-list">
       @for (conversation of conversations(); track conversation.id) {
-        <button type="button" class="channel-item dm-item" [title]="conversation.displayName" [attr.aria-current]="selectedConversation()?.id === conversation.id ? 'page' : null" [class.active]="selectedConversation()?.id === conversation.id" (click)="openConversation(conversation.id)">
+        <button type="button" class="channel-item dm-item" [title]="conversation.displayName" [attr.aria-current]="selectedConversation()?.id === conversation.id ? 'page' : null" [class.active]="selectedConversation()?.id === conversation.id" (click)="openConversation(conversation.id); showNavigation.set(false)">
           <span class="dm-avatar" aria-hidden="true">
             @if (conversation.type === 'GROUP') { <app-icon name="people" /> }
             @else { {{ conversation.displayName.charAt(0).toUpperCase() }} }
@@ -214,6 +216,10 @@
   </aside>
 
   <main class="channel-content">
+    <div class="mobile-navigation-bar">
+      <button type="button" class="header-action" aria-label="Open navigation" aria-controls="workspace-navigation" [attr.aria-expanded]="showNavigation()" (click)="showNavigation.set(!showNavigation())"><app-icon name="menu" /></button>
+      <span>{{ selectedWorkspace()?.name || 'Your conversations' }}</span>
+    </div>
 
     @if (selectedConversation(); as conversation) {
       <header class="channel-header conversation-header">
