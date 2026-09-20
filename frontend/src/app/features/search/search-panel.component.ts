@@ -6,6 +6,7 @@ import { SearchFilter, SearchHit, SearchService } from './search.service';
 
 @Component({
   selector: 'app-search-panel', standalone: true, imports: [CommonModule, ReactiveFormsModule],
+  styleUrl: './search-panel.component.css',
   template: `<div class="global-search" [formGroup]="form">
     <input type="search" formControlName="query" placeholder="Search messages and people" aria-label="Search" (input)="search()">
     @if(open()){<div class="search-results">
