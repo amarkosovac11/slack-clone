@@ -42,11 +42,10 @@
 .channel-symbol { display: inline-flex; flex: 0 0 24px; justify-content: center; color: var(--sidebar-muted); }
 .channel-symbol app-icon { --icon-size: 17px; }
 .channel-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-channel-settings-button { margin-right: 4px; opacity: 0; }
-.channel-row:hover .sidebar-channel-settings-button, .channel-row:focus-within .sidebar-channel-settings-button, .channel-row.active .sidebar-channel-settings-button { opacity: 1; }
+.sidebar-channel-settings-button { margin-right: 4px; border: 1px solid #ffffff2b; background: #ffffff0d; color: var(--sidebar-text); opacity: 1; }
+.channel-row:hover .sidebar-channel-settings-button, .channel-row:focus-within .sidebar-channel-settings-button, .channel-row.active .sidebar-channel-settings-button { border-color: #ffffff45; background: var(--sidebar-hover); color: #fff; }
 .channel-state { margin: 0; padding: 8px; color: var(--sidebar-muted); font-size: 12px; line-height: 1.6; }
 .sidebar-error { margin: 8px; padding: 12px; border-radius: 8px; background: #5b2d3b; color: #ffdce2; font-size: 12px; }
 .dm-avatar { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border-radius: 6px; background: #c8b5d7; color: #382646; font-size: 11px; font-weight: 650; }
 .dm-avatar app-icon { --icon-size: 16px; }
 .unread-badge { min-width: 18px; margin-left: auto; padding: 0 5px; border-radius: 6px; background: #e9dfef; color: #382646; font-size: 10px; font-weight: 700; line-height: 18px; text-align: center; }
-@media (hover: none) { .sidebar-channel-settings-button { opacity: 1; } }

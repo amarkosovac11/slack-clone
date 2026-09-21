@@ -1,4 +1,4 @@
-<button type="button" class="workspace-action" (click)="open()">
+<button type="button" class="workspace-action" [class.settings-appearance]="appearance() === 'settings'" (click)="open()">
   <app-icon name="people" />
   <span>People</span>
 </button>

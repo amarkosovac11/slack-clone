@@ -9,6 +9,21 @@
   color: white;
 }
 
+.workspace-action.settings-appearance {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.workspace-action.settings-appearance:hover {
+  border-color: #cbbdd3;
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
 .action-icon {
   width: 20px;
   font-size: 14px;

@@ -15,10 +15,18 @@ test('workspace navigation, account data, and empty state remain accessible', as
   await mockWorkspace(page);
   await page.goto('/workspaces');
   await expect(page.getByRole('heading', { name: 'Welcome to Studio North' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Start a new direct or group message' }),
+  ).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeHidden();
   await page.locator('.workspace-tools summary').click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Workspace settings' })).toBeVisible();
+  const settingsPeople = page
+    .getByRole('dialog', { name: 'Workspace settings' })
+    .getByRole('button', { name: 'People', exact: true });
+  await expect(settingsPeople).toBeVisible();
+  await expect(settingsPeople).toHaveCSS('color', 'rgb(34, 37, 46)');
   await page.getByRole('button', { name: 'Close settings' }).click();
   await page.getByRole('button', { name: 'Open account menu' }).click();
   await expect(page.locator('.account-menu')).toContainText('Away');
@@ -161,6 +169,10 @@ test('keyboard focus stays in dialogs and returns to the invoking button', async
 test('workspace tools and private channel dialogs remain reachable', async ({ page }) => {
   await mockWorkspace(page);
   await page.goto('/workspaces');
+  const channelOverflow = page.getByRole('button', { name: 'Open settings for general' });
+  await expect(channelOverflow).toBeVisible();
+  await expect(channelOverflow).toHaveCSS('opacity', '1');
+  await expect(channelOverflow).toHaveCSS('border-top-style', 'solid');
   await page.locator('.workspace-tools summary').click();
   for (const [button, heading, close] of [
     ['People', 'Workspace members', 'Close members'],
@@ -229,13 +241,11 @@ test('channel send, uploads, reactions, and incoming STOMP messages still work',
     )
     .toBe(true);
   await expect(page.getByRole('textbox', { name: 'Channel message' })).toHaveValue('');
-  await page
-    .getByLabel('Attach a file', { exact: true })
-    .setInputFiles({
-      name: 'review.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('Review notes'),
-    });
+  await page.getByLabel('Attach a file', { exact: true }).setInputFiles({
+    name: 'review.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Review notes'),
+  });
   await expect(page.locator('.selected-file')).toHaveText('review.txt');
   await page.getByRole('textbox', { name: 'Channel message' }).fill('Here are the notes.');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -255,6 +265,10 @@ test('DM composer sends over STOMP and incoming updates reach the message view',
 }) => {
   const api = await mockWorkspace(page);
   await page.goto('/conversations/10');
+  await expect(page.getByRole('button', { name: 'Conversation settings' })).toHaveCSS(
+    'border-top-style',
+    'solid',
+  );
   const destination = '/topic/users/1/conversations/10/messages';
   await expect.poll(() => api.subscribed(destination)).toBe(true);
   await page
@@ -310,15 +324,22 @@ test('profile, status, invitations, and new-message dialogs fit a phone viewport
   await page.getByRole('button', { name: 'Close pending invitations' }).click();
 });
 
-
 test('switching conversations clears the previous thread panel and draft', async ({ page }) => {
   await mockWorkspace(page);
   await page.goto('/workspaces/1/channels/1');
-  await page.locator('#message-101').getByRole('button', { name: /Thread/ }).click();
-  await page.getByRole('textbox', { name: 'Reply in thread' }).fill('A draft for this channel only');
+  await page
+    .locator('#message-101')
+    .getByRole('button', { name: /Thread/ })
+    .click();
+  await page
+    .getByRole('textbox', { name: 'Reply in thread' })
+    .fill('A draft for this channel only');
   await page.getByRole('button', { name: 'Maya Chen 2', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'Message thread' })).toHaveCount(0);
-  await page.locator('#message-101').getByRole('button', { name: /Thread/ }).click();
+  await page
+    .locator('#message-101')
+    .getByRole('button', { name: /Thread/ })
+    .click();
   await expect(page.getByRole('textbox', { name: 'Reply in thread' })).toHaveValue('');
   await page.getByRole('button', { name: 'design', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'Message thread' })).toHaveCount(0);

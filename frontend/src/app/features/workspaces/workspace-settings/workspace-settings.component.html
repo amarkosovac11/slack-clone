@@ -6,18 +6,18 @@
   <div class="settings-backdrop" role="presentation" (click)="close()">
     <section appDialogFocus class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="workspace-settings-title" (click)="$event.stopPropagation()">
       <header><div><h2 id="workspace-settings-title">Workspace settings</h2><p>{{ workspace().name }}</p></div>
-        <button type="button" aria-label="Close settings" [disabled]="isSaving()" (click)="close()">&times;</button></header>
+        <button type="button" class="settings-close" aria-label="Close settings" [disabled]="isSaving()" (click)="close()"><app-icon name="close" /></button></header>
       @if (workspace().currentUserRole !== 'MEMBER') {
       <section class="settings-section"><h3>General</h3><p>Update the name shown to everyone in this workspace.</p>
         <form [formGroup]="form" (ngSubmit)="save()"><label for="settings-workspace-name">Workspace name</label>
           <input id="settings-workspace-name" formControlName="name" />
           @if (form.controls.name.touched && form.controls.name.invalid) { <small>Workspace name must have between 2 and 100 characters.</small> }
-          <button type="submit" [disabled]="isSaving()">{{ isSaving() ? 'Saving...' : 'Save changes' }}</button>
+          <button type="submit" class="save-button" [disabled]="isSaving()">{{ isSaving() ? 'Saving...' : 'Save changes' }}</button>
         </form>
       </section>
       }
       <section class="settings-section"><h3>Members</h3><p>Review roles and manage access using the permissions assigned to you.</p>
-        <app-workspace-members [workspaceId]="workspace().id" [workspaceName]="workspace().name"
+        <app-workspace-members appearance="settings" [workspaceId]="workspace().id" [workspaceName]="workspace().name"
           [currentUserRole]="workspace().currentUserRole" [currentUserId]="currentUserId()" />
       </section>
       @if (workspace().currentUserRole === 'OWNER') { <section class="settings-section"><h3>Ownership</h3><p>Transfer ownership to an active member. You will become an administrator.</p>

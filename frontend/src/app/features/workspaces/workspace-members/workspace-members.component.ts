@@ -20,6 +20,7 @@ export class WorkspaceMembersComponent {
   readonly workspaceName = input.required<string>();
   readonly currentUserRole = input.required<WorkspaceRole>();
   readonly currentUserId = input.required<number>();
+  readonly appearance = input<'sidebar' | 'settings'>('sidebar');
 
   readonly isOpen = signal(false);
   readonly members = signal<WorkspaceMember[]>([]);

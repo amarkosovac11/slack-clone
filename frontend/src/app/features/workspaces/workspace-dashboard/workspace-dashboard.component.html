@@ -108,7 +108,6 @@
         <h2 [title]="selectedWorkspace()?.name || 'Your conversations'">{{ selectedWorkspace()?.name || 'Your conversations' }}</h2>
         @if (selectedWorkspace(); as workspace) { <span class="sidebar-role">{{ workspace.currentUserRole | titlecase }}</span> }
       </div>
-      <button type="button" class="sidebar-icon-button" title="New message" aria-label="Start a new direct or group message" (click)="openStartConversationModal()"><app-icon name="edit" /></button>
     </header>
     <div class="sidebar-utilities">
       <app-search-panel [workspaceId]="selectedWorkspaceId()" (selected)="openSearchHit($event)"></app-search-panel>
