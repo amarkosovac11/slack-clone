@@ -1,3 +1,6 @@
+import { DialogFocusDirective } from '../../../shared/ui/dialog-focus.directive';
+import { IconComponent } from '../../../shared/ui/icon.component';
+import { UserProfileComponent } from '../../../shared/ui/user-profile.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, computed, signal, inject } from '@angular/core';
@@ -35,7 +38,10 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
   selector: 'app-workspace-dashboard',
   standalone: true,
   imports: [
+    DialogFocusDirective,
     CommonModule,
+    IconComponent,
+    UserProfileComponent,
     ReactiveFormsModule,
     PendingWorkspaceInvitationsComponent,
     WorkspaceInvitationManagementComponent,
@@ -45,7 +51,7 @@ import { WorkspaceSettingsComponent } from '../workspace-settings/workspace-sett
     NotificationPanelComponent,
   ],
   templateUrl: './workspace-dashboard.component.html',
-  styleUrl: './workspace-dashboard.component.css',
+  styleUrls: ['./workspace-dashboard.component.css', './workspace-conversations.css', './workspace-navigation.css', './workspace-messages.css', './workspace-responsive.css'],
 })
 export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
@@ -57,10 +63,10 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   readonly errorMessage = signal('');
   readonly showCreateWorkspaceModal = signal(false);
   readonly workspaceCreateError = signal<string | null>(null);
-  readonly showProfilePlaceholder = signal(false);
   readonly showProfileModal = signal(false);
   readonly showStatusModal = signal(false);
   readonly showNotifications=signal(false);
+  readonly showNavigation = signal(false);
   readonly profileSaving = signal(false);
   readonly profileError = signal<string | null>(null);
   readonly userPresence = signal<Record<number,'ONLINE'|'AWAY'|'OFFLINE'>>({});
@@ -309,6 +315,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         return;
       }
 
+      if (this.selectedChannel()?.id !== channel.id) this.closeThread();
       this.resetChannelMembersModal();
       this.selectedChannel.set(channel);
       this.loadPrivateChannelMemberCount(workspaceId, channel);
@@ -497,14 +504,6 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  toggleProfilePlaceholder(): void {
-    this.showProfilePlaceholder.update((visible) => !visible);
-  }
-
-  closeProfilePlaceholder(): void {
-    this.showProfilePlaceholder.set(false);
-  }
-
   openChannelSettingsFromSidebar(event: Event, channel: Channel): void {
     event.stopPropagation();
     const workspaceId = this.selectedWorkspaceId();
@@ -610,6 +609,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
 
   openConversation(id: number, navigate = true): void {
     if (this.selectedConversation()?.id === id && !navigate) return;
+    this.closeThread();
     this.messageWebSocketService.unsubscribeFromChannel();this.clearAttachmentObjectUrls();
     this.selectedChannel.set(null); this.messages.set([]); this.conversationError.set(null);
     this.conversationLoading.set(true); this.conversationMessages.set([]); this.conversationCursor.set(null);this.conversationReceipts.set({});
@@ -692,8 +692,8 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     this.showGroupMembersModal.set(true); this.selectedGroupUserIds.set([]); this.loadGroupMembers(conversation.id);
   }
   avatarSrc(url:string|null|undefined):string|null{return url?`${environment.apiBaseUrl}${url}`:null;}
-  openProfile():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,username:u.username,title:u.title??''});this.showProfileModal.set(true);}
-  openStatus():void{const u=this.currentUser();if(!u)return;this.showProfilePlaceholder.set(false);this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
+  openProfile():void{const u=this.currentUser();if(!u)return;this.profileError.set(null);this.profileForm.reset({displayName:u.displayName,username:u.username,title:u.title??''});this.showProfileModal.set(true);}
+  openStatus():void{const u=this.currentUser();if(!u)return;this.profileError.set(null);this.statusForm.reset({emoji:u.customStatusEmoji??'',text:u.customStatusText??'',expiresAt:''});this.showStatusModal.set(true);}
   saveProfile():void{if(this.profileForm.invalid)return;this.profileSaving.set(true);const v=this.profileForm.getRawValue();this.authService.updateProfile({displayName:v.displayName,username:v.username,title:v.title||null}).subscribe({next:()=>{this.profileSaving.set(false);this.showProfileModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save profile.');}});}
   saveStatus():void{if(this.statusForm.invalid)return;this.profileSaving.set(true);const v=this.statusForm.getRawValue();this.authService.updateStatus({text:v.text||null,emoji:v.emoji||null,expiresAt:v.expiresAt?new Date(v.expiresAt).toISOString():null}).subscribe({next:()=>{this.profileSaving.set(false);this.showStatusModal.set(false);},error:e=>{this.profileSaving.set(false);this.profileError.set((e.error as ApiErrorResponse)?.message??'Could not save status.');}});}
   clearStatus():void{this.authService.clearStatus().subscribe(()=>this.showStatusModal.set(false));}
@@ -796,6 +796,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
   }
 
   private closeConversationSelection(): void {
+    this.closeThread();
     this.conversationWebSocketService.unsubscribeConversation(); this.selectedConversation.set(null);
     this.conversationMessages.set([]); this.conversationCursor.set(null);
     this.showConversationMenu.set(false); this.editingConversationMessageId.set(null); this.conversationMessagePendingDelete.set(null);
@@ -1153,6 +1154,7 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
     workspaceId: number,
     channelId: number | null = null
   ): void {
+    this.closeThread();
     this.messageWebSocketService.unsubscribeFromChannel();
     this.resetChannelMembersModal();
 
@@ -1297,7 +1299,11 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
         this.workspaces.set(workspaces);
         this.isLoading.set(false);
         const conversationRouteId = this.parsePositiveRouteId(this.route.snapshot.paramMap.get('conversationId'));
-        if (conversationRouteId !== null && workspaces.length > 0) this.selectedWorkspaceId.set(workspaces[0].id);
+        if (conversationRouteId !== null && workspaces.length > 0) {
+          const workspaceId = this.selectedWorkspaceId() ?? workspaces[0].id;
+          this.selectedWorkspaceId.set(workspaceId);
+          this.loadSidebarChannels(workspaceId);
+        }
         this.syncSelectionFromRoute();
         if (this.selectedWorkspaceId() === null && workspaces.length > 0) {
           this.selectWorkspace(workspaces[0].id);
@@ -1306,6 +1312,24 @@ export class WorkspaceDashboardComponent implements OnInit, OnDestroy {
       error: () => {
         this.errorMessage.set('Could not load workspaces.');
         this.isLoading.set(false);
+      },
+    });
+  }
+
+  // A DM route needs workspace navigation without replacing the active conversation.
+  private loadSidebarChannels(workspaceId: number): void {
+    this.channelsLoading.set(true);
+    this.channelsError.set(null);
+    this.channelService.getChannels(workspaceId).subscribe({
+      next: channels => {
+        if (this.selectedWorkspaceId() !== workspaceId) return;
+        this.channels.set(channels);
+        this.channelsLoading.set(false);
+      },
+      error: () => {
+        if (this.selectedWorkspaceId() !== workspaceId) return;
+        this.channelsError.set('Could not load channels.');
+        this.channelsLoading.set(false);
       },
     });
   }

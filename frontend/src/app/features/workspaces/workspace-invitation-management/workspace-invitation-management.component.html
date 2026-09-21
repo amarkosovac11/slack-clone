@@ -1,11 +1,11 @@
 <button type="button" class="manage-invitations-button" (click)="open()">
-  Manage invitations
+  <app-icon name="mail" /><span>Manage invitations</span>
 </button>
 
 @if (isOpen()) {
   <div class="invitation-backdrop" role="presentation" (click)="close()">
     <section
-      class="invitation-modal"
+      appDialogFocus class="invitation-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="invitation-modal-title"

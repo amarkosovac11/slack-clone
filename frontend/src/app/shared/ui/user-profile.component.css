@@ -1,0 +1,19 @@
+:host { position: relative; display: block; padding: 12px; border-top: 1px solid #ffffff12; }
+.profile-trigger { display: flex; width: 100%; align-items: center; gap: 12px; padding: 8px; border: 0; border-radius: var(--radius-row); background: transparent; color: var(--sidebar-text); text-align: left; }
+.profile-trigger:hover, .profile-trigger[aria-expanded='true'] { background: var(--sidebar-hover); }
+.avatar { position: relative; display: grid; width: 36px; height: 36px; flex: 0 0 36px; place-items: center; border-radius: 8px; background: #a9bada; color: #202e48; font-weight: 700; }
+.avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.presence { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border: 2px solid var(--sidebar); border-radius: 50%; background: #8b8992; }
+.presence.online { background: #55c99a; }
+.presence.away { background: #e6b65b; }
+.profile-copy { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.profile-copy strong, .profile-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-copy strong { font-size: 13px; font-weight: 600; }
+.profile-copy small { color: var(--sidebar-muted); font-size: 11px; }
+.profile-trigger > app-icon { --icon-size: 16px; color: var(--sidebar-muted); }
+.account-menu { position: absolute; z-index: 60; bottom: calc(100% - 4px); left: 12px; right: 12px; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); box-shadow: var(--shadow-popup); }
+.account-summary { display: grid; gap: 4px; padding: 8px 8px 12px; overflow-wrap: anywhere; }
+.account-summary small { color: var(--text-muted); font-size: 12px; }
+.account-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text); font-size: 13px; text-align: left; }
+.account-menu button:hover { background: var(--surface-hover); }
+.account-menu .sign-out { color: var(--danger); }

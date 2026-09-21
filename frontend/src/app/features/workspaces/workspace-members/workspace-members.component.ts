@@ -1,3 +1,5 @@
+import { DialogFocusDirective } from '../../../shared/ui/dialog-focus.directive';
+import { IconComponent } from '../../../shared/ui/icon.component';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, effect, input, signal, untracked } from '@angular/core';
@@ -9,7 +11,7 @@ import { WorkspaceService } from '../workspace.service';
 @Component({
   selector: 'app-workspace-members',
   standalone: true,
-  imports: [CommonModule],
+  imports: [DialogFocusDirective, IconComponent, CommonModule],
   templateUrl: './workspace-members.component.html',
   styleUrl: './workspace-members.component.css',
 })
