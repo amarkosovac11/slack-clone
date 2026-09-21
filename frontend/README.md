@@ -44,15 +44,18 @@ To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use th
 ng test
 ```
 
-## Running end-to-end tests
+## Running browser tests
 
-For end-to-end (e2e) testing, run:
+The Playwright suite runs the Angular UI with isolated API and STOMP fixtures.
 
 ```bash
-ng e2e
+npx playwright install chromium
+npm run test:e2e
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+It starts the development server when needed and checks messaging, navigation,
+popups, keyboard interaction, and responsive layouts. See
+[UI verification](UI_VERIFICATION.md) for coverage and live-backend limitations.
 
 ## Additional Resources
 
