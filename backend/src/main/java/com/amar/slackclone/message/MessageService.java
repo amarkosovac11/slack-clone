@@ -149,6 +149,7 @@ public class MessageService {
     }
 
     private void publishCreatedAfterCommit(Long workspaceId, MessageResponse response, MessageResponse threadRoot) {
+        // Snapshot DTOs inside the transaction; never publish a rolled-back message.
         MessageCreatedEvent event = new MessageCreatedEvent(workspaceId, response, threadRoot);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
