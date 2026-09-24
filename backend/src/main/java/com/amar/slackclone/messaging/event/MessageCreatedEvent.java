@@ -1,12 +1,11 @@
 package com.amar.slackclone.messaging.event;
 
-import java.time.Instant;
+import com.amar.slackclone.message.dto.MessageResponse;
 
+/** Saved message snapshot, plus the updated root snapshot for a thread reply. */
 public record MessageCreatedEvent(
-        Long messageId,
-        Long channelId,
-        Long senderId,
-        String content,
-        Instant createdAt
+        Long workspaceId,
+        MessageResponse message,
+        MessageResponse threadRoot
 ) {
 }
