@@ -1,6 +1,8 @@
 package com.amar.slackclone.message;
 
 import com.amar.slackclone.channel.Channel;
+import com.amar.slackclone.messaging.event.MessageCreatedEvent;
+import com.amar.slackclone.messaging.producer.MessageEventProducer;
 import com.amar.slackclone.channel.ChannelAccessService;
 import com.amar.slackclone.channel.AuthenticatedUserNotFoundException;
 import com.amar.slackclone.message.dto.CreateMessageRequest;
@@ -32,6 +34,7 @@ public class MessageService {
     private final WorkspaceMemberRepository workspaceMembers; private final ChannelMemberRepository channelMembers;
     private final ChannelMessageReactionRepository reactions; private final ChannelMessageAttachmentRepository attachments;
     private final NotificationService notificationService;
+    private final MessageEventProducer messageEventProducer;
 
     public MessageService(
         MessageRepository messageRepository,
@@ -39,7 +42,7 @@ public class MessageService {
         UserRepository userRepository,
         SimpMessagingTemplate messagingTemplate, ChannelPinnedMessageRepository pins, ChannelMessageMentionRepository mentions,
         WorkspaceMemberRepository workspaceMembers, ChannelMemberRepository channelMembers,ChannelMessageReactionRepository reactions,ChannelMessageAttachmentRepository attachments,
-        NotificationService notificationService
+        NotificationService notificationService, MessageEventProducer messageEventProducer
     ) {
         this.messageRepository = messageRepository;
         this.channelAccessService = channelAccessService;
@@ -48,6 +51,7 @@ public class MessageService {
         this.pins=pins;this.mentions=mentions;this.workspaceMembers=workspaceMembers;this.channelMembers=channelMembers;
         this.reactions=reactions;this.attachments=attachments;
         this.notificationService=notificationService;
+        this.messageEventProducer = messageEventProducer;
     }
 
     @Transactional(readOnly = true)
@@ -95,7 +99,7 @@ public class MessageService {
         message.setContent(request.content().trim());
 
         message=messageRepository.saveAndFlush(message); persistMentions(message,true); MessageResponse response = toMessageResponse(message);
-        broadcastAfterCommit(workspaceId, channelId, ChannelMessageEventType.MESSAGE_CREATED, response, null);
+        publishCreatedAfterCommit(workspaceId, response, null);
         return response;
     }
 
@@ -144,6 +148,17 @@ public class MessageService {
         if (message.getDeletedAt() != null) throw new MessageConflictException("Message is already deleted");
     }
 
+    private void publishCreatedAfterCommit(Long workspaceId, MessageResponse response, MessageResponse threadRoot) {
+        // Snapshot DTOs inside the transaction; never publish a rolled-back message.
+        MessageCreatedEvent event = new MessageCreatedEvent(workspaceId, response, threadRoot);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                messageEventProducer.send(event);
+            }
+        });
+    }
+
     private void broadcastAfterCommit(
         Long workspaceId,
         Long channelId,
@@ -189,7 +204,7 @@ public class MessageService {
     @Transactional public MessageResponse addReaction(Long workspaceId,Long channelId,Long messageId,String emoji,String email){channelAccessService.validateChannelWriteAccess(workspaceId,channelId,email);Message m=requireMessage(channelId,messageId);requireNotDeleted(m);User u=getAuthenticatedUser(email);reactions.findByMessageIdAndUserIdAndEmoji(messageId,u.getId(),emoji).orElseGet(()->reactions.save(new ChannelMessageReaction(m,u,emoji)));MessageResponse shared=toMessageResponse(m);broadcastAfterCommit(workspaceId,channelId,ChannelMessageEventType.REACTION_UPDATED,shared,m.getThreadRootMessage()==null?null:m.getThreadRootMessage().getId());return toMessageResponse(m,u.getId());}
     @Transactional public MessageResponse removeReaction(Long workspaceId,Long channelId,Long messageId,String emoji,String email){channelAccessService.validateChannelWriteAccess(workspaceId,channelId,email);Message m=requireMessage(channelId,messageId);User u=getAuthenticatedUser(email);reactions.findByMessageIdAndUserIdAndEmoji(messageId,u.getId(),emoji).ifPresent(reactions::delete);MessageResponse shared=toMessageResponse(m);broadcastAfterCommit(workspaceId,channelId,ChannelMessageEventType.REACTION_UPDATED,shared,m.getThreadRootMessage()==null?null:m.getThreadRootMessage().getId());return toMessageResponse(m,u.getId());}
     @Transactional(readOnly=true) public List<MessageResponse> thread(Long workspaceId,Long channelId,Long messageId,String email){channelAccessService.validateChannelAccess(workspaceId,channelId,email);Message root=requireMessage(channelId,messageId);if(root.getThreadRootMessage()!=null)root=root.getThreadRootMessage();List<MessageResponse> out=new ArrayList<>();out.add(toMessageResponse(root));out.addAll(messageRepository.findAllByThreadRootMessageIdOrderByCreatedAtAsc(root.getId()).stream().map(this::toMessageResponse).toList());return out;}
-    @Transactional public MessageResponse reply(Long workspaceId,Long channelId,Long messageId,CreateMessageRequest request,String email){Channel c=channelAccessService.validateChannelWriteAccess(workspaceId,channelId,email);Message target=requireMessage(channelId,messageId);Message root=target.getThreadRootMessage()==null?target:target.getThreadRootMessage();User actor=getAuthenticatedUser(email);Message reply=new Message();reply.setChannel(c);reply.setSender(actor);reply.setContent(request.content().trim());reply.setThreadRootMessage(root);reply=messageRepository.saveAndFlush(reply);persistMentions(reply,true);notificationService.create(root.getSender().getId(),actor.getId(),NotificationType.THREAD_REPLY,actor.getDisplayName()+" replied to your thread in #"+c.getName(),new NotificationService.Context(workspaceId,channelId,null,root.getId(),null));MessageResponse rr=toMessageResponse(reply);broadcastAfterCommit(workspaceId,channelId,ChannelMessageEventType.THREAD_REPLY_CREATED,rr,root.getId());broadcastAfterCommit(workspaceId,channelId,ChannelMessageEventType.THREAD_UPDATED,toMessageResponse(root),root.getId());return rr;}
+    @Transactional public MessageResponse reply(Long workspaceId,Long channelId,Long messageId,CreateMessageRequest request,String email){Channel c=channelAccessService.validateChannelWriteAccess(workspaceId,channelId,email);Message target=requireMessage(channelId,messageId);Message root=target.getThreadRootMessage()==null?target:target.getThreadRootMessage();User actor=getAuthenticatedUser(email);Message reply=new Message();reply.setChannel(c);reply.setSender(actor);reply.setContent(request.content().trim());reply.setThreadRootMessage(root);reply=messageRepository.saveAndFlush(reply);persistMentions(reply,true);notificationService.create(root.getSender().getId(),actor.getId(),NotificationType.THREAD_REPLY,actor.getDisplayName()+" replied to your thread in #"+c.getName(),new NotificationService.Context(workspaceId,channelId,null,root.getId(),null));MessageResponse rr=toMessageResponse(reply);publishCreatedAfterCommit(workspaceId,rr,toMessageResponse(root));return rr;}
     private List<ReactionSummary> reactionSummaries(Long id,Long viewer){return reactions.findAllByMessageId(id).stream().collect(java.util.stream.Collectors.groupingBy(ChannelMessageReaction::getEmoji)).entrySet().stream().map(e->new ReactionSummary(e.getKey(),e.getValue().size(),e.getValue().stream().map(x->x.getUser().getId()).toList(),e.getValue().stream().limit(20).map(x->x.getUser().getDisplayName()).toList())).toList();}
     private List<AttachmentResponse> attachmentResponses(Long id){return attachments.findAllByMessageId(id).stream().map(a->new AttachmentResponse(a.getId(),a.getOriginalFileName(),a.getMimeType(),a.getFileSize(),"/api/attachments/channel/"+a.getId())).toList();}
     @Transactional public PinnedMessageResponse pin(Long workspaceId,Long channelId,Long messageId,String email){Channel c=channelAccessService.validateChannelWriteAccess(workspaceId,channelId,email);Message m=requireMessage(channelId,messageId);requireNotDeleted(m);User u=getAuthenticatedUser(email);ChannelPinnedMessage p=pins.findById(messageId).orElseGet(ChannelPinnedMessage::new);p.setMessage(m);p.setChannel(c);p.setPinnedBy(u);p=pins.save(p);broadcastAfterCommit(workspaceId,channelId,ChannelMessageEventType.MESSAGE_PINNED,toMessageResponse(m),null);return pinResponse(p);}

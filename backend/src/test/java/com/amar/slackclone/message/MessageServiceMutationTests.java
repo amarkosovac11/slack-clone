@@ -25,6 +25,7 @@ class MessageServiceMutationTests {
     private final ChannelAccessService accessService = mock(ChannelAccessService.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final SimpMessagingTemplate messaging = mock(SimpMessagingTemplate.class);
+    private final com.amar.slackclone.messaging.producer.MessageEventProducer producer = mock(com.amar.slackclone.messaging.producer.MessageEventProducer.class);
     private MessageService service;
     private User sender;
     private Message message;
@@ -35,7 +36,7 @@ class MessageServiceMutationTests {
                 mock(com.amar.slackclone.workspace.WorkspaceMemberRepository.class),
                 mock(com.amar.slackclone.channel.ChannelMemberRepository.class),
                 mock(ChannelMessageReactionRepository.class), mock(ChannelMessageAttachmentRepository.class),
-                mock(com.amar.slackclone.notification.NotificationService.class));
+                mock(com.amar.slackclone.notification.NotificationService.class), producer);
         sender = user(1L, "sender@example.com");
         Channel channel = new Channel(); ReflectionTestUtils.setField(channel, "id", 20L);
         message = new Message(); ReflectionTestUtils.setField(message, "id", 30L);
@@ -99,6 +100,56 @@ class MessageServiceMutationTests {
         var history = service.getMessages(10L, 20L, sender.getEmail());
         assertEquals(1, history.size()); assertNull(history.getFirst().content());
         assertNotNull(history.getFirst().deletedAt());
+    }
+
+    @Test void creationPublishesSavedSnapshotOnlyAfterCommit() {
+        when(accessService.validateChannelWriteAccess(10L, 20L, sender.getEmail())).thenReturn(message.getChannel());
+        when(repository.saveAndFlush(any())).thenReturn(message);
+        var response = service.createMessage(10L, 20L,
+                new com.amar.slackclone.message.dto.CreateMessageRequest("hello"), sender.getEmail());
+        verifyNoInteractions(producer);
+        TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCommit());
+        verify(producer).send(new com.amar.slackclone.messaging.event.MessageCreatedEvent(10L, response, null));
+        verifyNoInteractions(messaging);
+    }
+
+    @Test void replyPublishesReplyAndUpdatedRootInOneEvent() {
+        when(accessService.validateChannelWriteAccess(10L, 20L, sender.getEmail())).thenReturn(message.getChannel());
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> {
+            Message saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 31L);
+            return saved;
+        });
+        when(repository.countByThreadRootMessageId(30L)).thenReturn(1L);
+        var response = service.reply(10L, 20L, 30L,
+                new com.amar.slackclone.message.dto.CreateMessageRequest("reply"), sender.getEmail());
+        verifyNoInteractions(producer, messaging);
+        TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCommit());
+        var captor = org.mockito.ArgumentCaptor.forClass(com.amar.slackclone.messaging.event.MessageCreatedEvent.class);
+        verify(producer).send(captor.capture());
+        assertEquals(response, captor.getValue().message());
+        assertEquals(30L, response.threadRootMessageId());
+        assertEquals(30L, captor.getValue().threadRoot().id());
+        assertEquals(1L, captor.getValue().threadRoot().replyCount());
+        verifyNoInteractions(messaging);
+    }
+
+    @Test void failedSaveDoesNotPublish() {
+        when(accessService.validateChannelWriteAccess(10L, 20L, sender.getEmail())).thenReturn(message.getChannel());
+        when(repository.saveAndFlush(any())).thenThrow(new IllegalStateException("save failed"));
+        assertThrows(IllegalStateException.class, () -> service.createMessage(10L, 20L,
+                new com.amar.slackclone.message.dto.CreateMessageRequest("hello"), sender.getEmail()));
+        TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCommit());
+        verifyNoInteractions(producer, messaging);
+    }
+
+    @Test void rollbackDoesNotPublish() {
+        when(accessService.validateChannelWriteAccess(10L, 20L, sender.getEmail())).thenReturn(message.getChannel());
+        when(repository.saveAndFlush(any())).thenReturn(message);
+        service.createMessage(10L, 20L, new com.amar.slackclone.message.dto.CreateMessageRequest("hello"), sender.getEmail());
+        TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCompletion(
+                org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK));
+        verifyNoInteractions(producer, messaging);
     }
 
     private User user(Long id, String email) {

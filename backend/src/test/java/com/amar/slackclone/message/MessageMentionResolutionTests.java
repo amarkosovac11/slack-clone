@@ -25,7 +25,7 @@ class MessageMentionResolutionTests {
         when(access.validateChannelWriteAccess(3L,4L,sender.getEmail())).thenReturn(channel);when(users.findByEmailIgnoreCase(sender.getEmail())).thenReturn(Optional.of(sender));
         when(workspaceMembers.findAllByWorkspaceId(3L)).thenReturn(List.of(new WorkspaceMember(workspace,mentioned,WorkspaceRole.MEMBER,Instant.now())));
         when(messages.saveAndFlush(any())).thenAnswer(invocation->{Message m=invocation.getArgument(0);ReflectionTestUtils.setField(m,"id",8L);return m;});
-        MessageService service=new MessageService(messages,access,users,mock(SimpMessagingTemplate.class),mock(ChannelPinnedMessageRepository.class),mentions,workspaceMembers,mock(ChannelMemberRepository.class),mock(ChannelMessageReactionRepository.class),mock(ChannelMessageAttachmentRepository.class),notifications);
+        MessageService service=new MessageService(messages,access,users,mock(SimpMessagingTemplate.class),mock(ChannelPinnedMessageRepository.class),mentions,workspaceMembers,mock(ChannelMemberRepository.class),mock(ChannelMessageReactionRepository.class),mock(ChannelMessageAttachmentRepository.class),notifications,mock(com.amar.slackclone.messaging.producer.MessageEventProducer.class));
         TransactionSynchronizationManager.initSynchronization();
         try{service.createMessage(3L,4L,new CreateMessageRequest("Hello @amar.dev and @unknown"),sender.getEmail());}finally{TransactionSynchronizationManager.clearSynchronization();}
         var captor=org.mockito.ArgumentCaptor.forClass(ChannelMessageMention.class);verify(mentions,times(1)).save(captor.capture());assertEquals(mentioned.getId(),captor.getValue().getUser().getId());
