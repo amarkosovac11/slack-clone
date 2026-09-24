@@ -110,6 +110,28 @@ class MessageServiceMutationTests {
         verifyNoInteractions(producer);
         TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCommit());
         verify(producer).send(new com.amar.slackclone.messaging.event.MessageCreatedEvent(10L, response, null));
+        verifyNoInteractions(messaging);
+    }
+
+    @Test void replyPublishesReplyAndUpdatedRootInOneEvent() {
+        when(accessService.validateChannelWriteAccess(10L, 20L, sender.getEmail())).thenReturn(message.getChannel());
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> {
+            Message saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 31L);
+            return saved;
+        });
+        when(repository.countByThreadRootMessageId(30L)).thenReturn(1L);
+        var response = service.reply(10L, 20L, 30L,
+                new com.amar.slackclone.message.dto.CreateMessageRequest("reply"), sender.getEmail());
+        verifyNoInteractions(producer, messaging);
+        TransactionSynchronizationManager.getSynchronizations().forEach(s -> s.afterCommit());
+        var captor = org.mockito.ArgumentCaptor.forClass(com.amar.slackclone.messaging.event.MessageCreatedEvent.class);
+        verify(producer).send(captor.capture());
+        assertEquals(response, captor.getValue().message());
+        assertEquals(30L, response.threadRootMessageId());
+        assertEquals(30L, captor.getValue().threadRoot().id());
+        assertEquals(1L, captor.getValue().threadRoot().replyCount());
+        verifyNoInteractions(messaging);
     }
 
     @Test void failedSaveDoesNotPublish() {

@@ -19,7 +19,7 @@ class MessageConversionTests {
         var message = converter.toMessage(event, new MessageProperties());
         assertEquals("application/json", message.getMessageProperties().getContentType());
         assertEquals(event, converter.fromMessage(message));
-        var consumer = new com.amar.slackclone.messaging.consumer.MessageEventConsumer();
+        var consumer = new com.amar.slackclone.messaging.consumer.MessageEventConsumer(org.mockito.Mockito.mock(org.springframework.messaging.simp.SimpMessagingTemplate.class));
         assertDoesNotThrow(() -> consumer.receive((MessageCreatedEvent) converter.fromMessage(message)));
         message.getMessageProperties().getHeaders().clear();
         message.getMessageProperties().setInferredArgumentType(MessageCreatedEvent.class);
